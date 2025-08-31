@@ -35,10 +35,22 @@ ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_data_dir 
 ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_tmp_dir }}
 
 # Security settings
-# NoNewPrivileges=true
-# ProtectSystem=strict
-# PrivateTmp=true
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 ReadWritePaths={{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }}
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Enhanced restart behavior
+StartLimitInterval=300
+StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target

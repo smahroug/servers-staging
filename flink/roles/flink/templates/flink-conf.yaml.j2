@@ -165,6 +165,15 @@ jobmanager.execution.failover-strategy: region
 #
 rest.port: 8081
 
+{% if flink_web_ssl_enabled %}
+# SSL configuration for Flink Web UI
+rest.ssl.enabled: true
+rest.ssl.keystore: {{ flink_web_ssl_keystore_path }}
+rest.ssl.keystore-password: {{ flink_web_ssl_keystore_password }}
+rest.ssl.truststore: {{ flink_web_ssl_truststore_path }}
+rest.ssl.truststore-password: {{ flink_web_ssl_truststore_password }}
+{% endif %}
+
 # The address to which the REST client will connect to
 #
 rest.address: flink-server
@@ -277,3 +286,23 @@ io.tmp.dirs: {{ flink_tmp_dir }}
 
 # Java home environment setting
 env.java.home: {{ java_home }}
+
+# Logging configuration
+{% if flink_log_level is defined %}
+logger.level: {{ flink_log_level }}
+{% endif %}
+
+{% if flink_log_max_files is defined and flink_log_max_size is defined %}
+# Log rotation settings
+log.file: {{ flink_log_dir }}/flink.log
+{% endif %}
+
+# JVM options for monitoring and performance
+{% if flink_jvm_gc_logging %}
+env.java.opts.jobmanager: -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:{{ flink_log_dir }}/jobmanager-gc.log
+env.java.opts.taskmanager: -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:{{ flink_log_dir }}/taskmanager-gc.log
+{% endif %}
+
+{% if flink_jvm_heap_dump_on_oom %}
+env.java.opts.all: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath={{ flink_jvm_heap_dump_path }}
+{% endif %}

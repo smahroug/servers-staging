@@ -49,36 +49,87 @@ flink/
 
 ## Quick Start
 
-1. **Configure Inventory**: Edit `inventory/hosts.yml` with your server details:
-   ```yaml
-   all:
-     children:
-       flink_servers:
-         hosts:
-           flink-master:
-             ansible_host: your-master-ip
-             flink_role: master
-           flink-worker-1:
-             ansible_host: your-worker-ip-1
-             flink_role: worker
-           flink-worker-2:
-             ansible_host: your-worker-ip-2
-             flink_role: worker
-   ```
+### 1. Security Setup (Recommended)
+For production deployments, use SSH keys and Ansible Vault:
 
-2. **Test Connectivity**:
-   ```bash
-   ansible -i inventory/hosts.yml flink_servers -m ping
-   ```
+```bash
+# Generate SSH key pair if you don't have one
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/flink_deploy_key
 
-3. **Deploy Flink**:
-   ```bash
-   ansible-playbook -i inventory/hosts.yml playbook.yml
-   ```
+# Copy public key to target servers
+ssh-copy-id -i ~/.ssh/flink_deploy_key.pub user@server-ip
 
-4. **Verify Installation**:
-   - Access Flink Web UI: `http://your-master-ip:8081`
-   - Check service status: `systemctl status flink`
+# Create vault file for sensitive data
+ansible-vault create group_vars/all/vault.yml
+```
+
+### 2. Configure Inventory
+Choose your configuration approach:
+
+**Option A: Use the secure template (Recommended)**
+```bash
+cp inventory/hosts.yml.template inventory/hosts.yml
+# Edit inventory/hosts.yml with your server details and SSH key path
+```
+
+**Option B: Use the basic template**
+```bash
+# Edit inventory/hosts.yml with your server details (see example below)
+```
+
+Example inventory configuration:
+```yaml
+all:
+  children:
+    flink_servers:
+      hosts:
+        flink-master:
+          ansible_host: your-master-ip
+          flink_role: master
+        flink-worker-1:
+          ansible_host: your-worker-ip-1
+          flink_role: worker
+        flink-worker-2:
+          ansible_host: your-worker-ip-2
+          flink_role: worker
+      vars:
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: ~/.ssh/flink_deploy_key
+        ansible_become: true
+```
+
+### 3. Choose Configuration Profile
+Select and customize a configuration profile:
+
+```bash
+# For development
+cp vars-examples/development.yml roles/flink/vars/main.yml
+
+# For production  
+cp vars-examples/production.yml roles/flink/vars/main.yml
+
+# For security-focused deployment
+cp vars-examples/security.yml roles/flink/vars/main.yml
+```
+
+### 4. Test Connectivity
+```bash
+ansible -i inventory/hosts.yml flink_servers -m ping
+```
+
+### 5. Deploy Flink
+```bash
+# Run enhanced installation script with validation
+./install.sh
+
+# Or run directly with additional options
+ansible-playbook -i inventory/hosts.yml playbook.yml --ask-become-pass --diff
+```
+
+### 6. Verify Installation
+- Access Flink Web UI: `http://your-master-ip:8081`
+- Check service status: `ansible -i inventory/hosts.yml flink_servers -m shell -a "systemctl status flink"`
+- View logs: `ansible -i inventory/hosts.yml flink_servers -m shell -a "tail -f /var/log/flink/flink.log"`
 
 ## Configuration
 
@@ -238,6 +289,107 @@ flink_high_availability: true
 flink_high_availability_storageDir: "hdfs://namenode:port/flink/ha/"
 ```
 
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### Service Startup Issues
+```bash
+# Check service status
+sudo systemctl status flink
+
+# Check service logs
+sudo journalctl -u flink -f
+
+# Check Flink logs
+tail -f /var/log/flink/flink.log
+```
+
+#### Memory Issues
+- **OutOfMemoryError**: Increase `flink_jobmanager_heap_size` or `flink_taskmanager_memory_process_size`
+- **GC Issues**: Monitor GC logs in `/var/log/flink/` and adjust memory settings
+
+#### Network Connectivity
+```bash
+# Test JobManager RPC port
+telnet <jobmanager-host> 6123
+
+# Test Web UI access
+curl http://<jobmanager-host>:8081
+
+# Check firewall rules
+sudo ufw status
+```
+
+#### Configuration Issues
+```bash
+# Validate Flink configuration
+{{ flink_home }}/bin/flink list
+
+# Check configuration file
+cat {{ flink_config_dir }}/flink-conf.yaml
+```
+
+### Performance Optimization
+
+#### Memory Tuning Guidelines
+- **Small clusters (1-4 nodes)**: 1-2GB JobManager, 2-4GB TaskManager
+- **Medium clusters (5-20 nodes)**: 2-4GB JobManager, 4-8GB TaskManager  
+- **Large clusters (20+ nodes)**: 4-8GB JobManager, 8-16GB TaskManager
+
+#### GC Tuning
+For production workloads, consider these JVM options:
+```yaml
+env.java.opts.jobmanager: -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions
+env.java.opts.taskmanager: -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions
+```
+
+## Security Considerations
+
+### Authentication and Authorization
+- Use SSH key-based authentication instead of passwords
+- Store sensitive variables in Ansible Vault
+- Enable SSL/TLS for Flink Web UI in production
+
+### Example Vault Usage
+```bash
+# Create vault file for sensitive data
+ansible-vault create group_vars/all/vault.yml
+
+# Add encrypted variables
+vault_ansible_password: your_secure_password
+vault_keystore_password: your_keystore_password
+```
+
+### Network Security
+- Configure firewall rules to restrict access to Flink ports
+- Use VPN or private networks for cluster communication
+- Enable SSL for all Flink communications in production
+
+### File System Security
+- Ensure proper file permissions on Flink directories
+- Use dedicated user account for Flink service
+- Regularly rotate logs and monitor disk usage
+
+## High Availability
+
+### ZooKeeper Integration
+For production deployments, enable high availability:
+
+```yaml
+flink_high_availability: true
+flink_high_availability_storageDir: "hdfs://namenode:port/flink/ha/"
+```
+
+### Backup and Recovery
+```bash
+# Backup Flink configuration
+tar -czf flink-config-backup.tar.gz {{ flink_config_dir }}/
+
+# Backup savepoints
+{{ flink_home }}/bin/flink savepoint <job-id> hdfs://path/to/savepoints/
+```
+
 ## Monitoring
 
 Monitor your Flink cluster using:
@@ -246,6 +398,14 @@ Monitor your Flink cluster using:
 2. **Metrics**: Export metrics to external systems (Prometheus, InfluxDB)
 3. **Logging**: Centralized logging with ELK stack
 4. **System monitoring**: Monitor CPU, memory, and disk usage
+5. **JVM monitoring**: Use GC logs and heap dumps for performance analysis
+
+### Key Metrics to Monitor
+- Job throughput and latency
+- Checkpoint duration and success rate
+- GC frequency and duration
+- Memory usage (heap and off-heap)
+- Network I/O and disk I/O
 
 ## Support
 
