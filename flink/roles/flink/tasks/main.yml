@@ -64,6 +64,10 @@
       - tar
       - python3
     state: present
+  retries: 5
+  delay: 15
+  register: package_result
+  until: package_result is succeeded
 
 - name: Install Java if not already present
   apt:
@@ -126,7 +130,12 @@
     url: "{{ flink_download_url }}"
     dest: "/tmp/{{ flink_package }}"
     mode: '0644'
+    timeout: 60
   when: not flink_installed.stat.exists
+  retries: 3
+  delay: 10
+  register: download_result
+  until: download_result is succeeded
 
 - name: Extract Flink
   unarchive:
@@ -184,6 +193,23 @@
   notify:
     - restart flink
 
+- name: Configure log rotation for Flink logs
+  copy:
+    content: |
+      {{ flink_log_dir }}/*.log {
+          daily
+          missingok
+          rotate {{ flink_log_max_files }}
+          compress
+          notifempty
+          create 644 {{ flink_user }} {{ flink_group }}
+          size {{ flink_log_max_size }}
+          copytruncate
+      }
+    dest: /etc/logrotate.d/flink
+    mode: '0644'
+  when: flink_log_max_files is defined and flink_log_max_size is defined
+
 - name: Clean up downloaded package
   file:
     path: "/tmp/{{ flink_package }}"
@@ -204,3 +230,29 @@
     enabled: "{{ flink_enable_service }}"
     daemon_reload: yes
   when: flink_role is defined and flink_role == 'worker'
+
+- name: Wait for Flink service to be active (JobManager)
+  wait_for:
+    port: "{{ flink_jobmanager_rpc_port }}"
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 10
+    timeout: 60
+  when: flink_role is defined and flink_role == 'master' and flink_start_service
+
+- name: Wait for Flink Web UI to be available
+  wait_for:
+    port: 8081
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 5
+    timeout: 30
+  when: flink_role is defined and flink_role == 'master' and flink_start_service
+
+- name: Verify Flink installation
+  command: "{{ flink_home }}/bin/flink --version"
+  register: flink_version_check
+  changed_when: false
+  failed_when: flink_version_check.rc != 0
+
+- name: Display Flink version information
+  debug:
+    msg: "Flink installation verified: {{ flink_version_check.stdout_lines[0] if flink_version_check.stdout_lines else 'Version check failed' }}"

@@ -1,6 +1,6 @@
 ---
 # Flink version and download settings
-flink_version: "2.1.0"
+flink_version: "1.18.1"
 flink_scala_version: "2.12"
 flink_package: "flink-{{ flink_version }}-bin-scala_{{ flink_scala_version }}.tgz"
 flink_download_url: "https://archive.apache.org/dist/flink/flink-{{ flink_version }}/{{ flink_package }}"
@@ -39,3 +39,23 @@ flink_taskmanager_bind_host: "{{ flink_bind_host }}"
 # Service configuration
 flink_start_service: true
 flink_enable_service: true
+
+# Security configuration
+flink_web_ssl_enabled: false
+flink_web_ssl_keystore_path: ""
+flink_web_ssl_keystore_password: ""
+flink_web_ssl_truststore_path: ""
+flink_web_ssl_truststore_password: ""
+
+# JVM security options
+flink_jvm_security_enabled: true
+
+# JVM monitoring and performance
+flink_jvm_gc_logging: true
+flink_jvm_heap_dump_on_oom: true
+flink_jvm_heap_dump_path: "{{ flink_log_dir }}"
+
+# Log configuration
+flink_log_level: "INFO"
+flink_log_max_files: 10
+flink_log_max_size: "100MB"

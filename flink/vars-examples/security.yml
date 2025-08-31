@@ -1,0 +1,48 @@
+# Security-Focused Configuration Example
+# Copy this file to roles/flink/vars/main.yml and customize for your secure environment
+
+---
+# Security-hardened Flink configuration
+
+# Use latest stable version with security patches
+flink_version: "1.18.1"
+
+# Memory settings (adjust based on your security requirements)
+flink_jobmanager_heap_size: "1536m"
+flink_taskmanager_memory_process_size: "3072m"
+flink_taskmanager_memory_flink_size: "2304m"
+
+# Moderate parallelism for security monitoring
+flink_parallelism_default: 2
+flink_taskmanager_numberOfTaskSlots: 2
+
+# More frequent checkpointing for better recovery
+flink_checkpointing_interval: "5000"
+
+# Security configuration
+flink_web_ssl_enabled: true
+flink_web_ssl_keystore_path: "/opt/flink/conf/flink-keystore.jks"
+flink_web_ssl_keystore_password: "{{ vault_keystore_password }}"
+flink_web_ssl_truststore_path: "/opt/flink/conf/flink-truststore.jks"
+flink_web_ssl_truststore_password: "{{ vault_truststore_password }}"
+
+# JVM security
+flink_jvm_security_enabled: true
+
+# Enhanced monitoring and logging
+flink_jvm_gc_logging: true
+flink_jvm_heap_dump_on_oom: true
+flink_log_level: "WARN"  # Reduced logging for security
+flink_log_max_files: 5   # Limited log retention
+flink_log_max_size: "50MB"
+
+# Network configuration (bind to specific interfaces)
+flink_bind_host: "{{ ansible_default_ipv4.address }}"
+
+# Service configuration
+flink_start_service: true
+flink_enable_service: true
+
+# High availability (recommended for production security)
+flink_high_availability: true
+flink_high_availability_storageDir: "file:///opt/flink/ha/"
