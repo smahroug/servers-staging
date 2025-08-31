@@ -8,13 +8,14 @@ Apache Flink is a framework and distributed processing engine for stateful compu
 
 ## Features
 
-- Installs Java 11 (prerequisite for Flink)
+- **Smart Java Detection**: Automatically detects existing Java installations and only installs Java 11 if needed
 - Downloads and installs Apache Flink
 - Configures Flink cluster (standalone mode)
 - Creates systemd services for automatic startup
 - Supports both JobManager (master) and TaskManager (worker) nodes
 - Configurable memory settings and cluster parameters
 - Security hardened systemd service configuration
+- **Dynamic JAVA_HOME Configuration**: Automatically configures JAVA_HOME based on detected Java installation
 
 ## Directory Structure
 
@@ -116,6 +117,27 @@ ansible-playbook -i inventory/hosts.yml playbook.yml \
 | `flink_taskmanager_numberOfTaskSlots` | 1 | Number of task slots per TaskManager |
 | `flink_checkpointing_interval` | "10000" | Checkpoint interval in ms |
 
+## Java Detection and Installation
+
+The playbook includes intelligent Java detection that:
+
+- **Detects existing Java installations** using `which java` command and common installation paths
+- **Supports multiple Java distributions**: OpenJDK, Oracle JDK, Temurin, Amazon Corretto, etc.
+- **Only installs Java if needed**: Skips Java installation if a compatible version is already present
+- **Automatically configures JAVA_HOME**: Uses detected Java installation path in Flink configuration
+- **Fallback installation**: Installs OpenJDK 11 if no Java is found
+
+### Java Detection Paths
+
+The playbook checks these common Java installation locations:
+- `/usr/lib/jvm/java-11-openjdk-amd64`
+- `/usr/lib/jvm/java-8-openjdk-amd64`
+- `/usr/lib/jvm/default-java`
+- `/opt/java`
+- `/usr/java/latest`
+
+You can override the Java detection by setting `java_home` variable explicitly.
+
 ## Network Ports
 
 | Service | Port | Description |
@@ -164,7 +186,10 @@ sudo -u flink /opt/flink/bin/taskmanager.sh stop
 
 ### Common Issues
 
-1. **Java not found**: Ensure Java 11 is installed and `JAVA_HOME` is set correctly
+1. **Java not found**: The playbook automatically detects existing Java installations. If you encounter Java issues:
+   - Check detected Java path: `ansible-playbook -i inventory/hosts.yml playbook.yml --tags flink -v`
+   - Manually verify Java: `java -version` and `echo $JAVA_HOME`
+   - The playbook supports OpenJDK, Oracle JDK, and other Java distributions
 2. **Permission denied**: Check that the `flink` user has proper permissions
 3. **Network connectivity**: Verify firewall settings and network connectivity between nodes
 4. **Memory issues**: Adjust memory settings based on your server specifications
