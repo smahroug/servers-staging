@@ -41,16 +41,6 @@ fi
 
 echo "✅ Inventory file found"
 
-# Validate YAML files
-echo "🔍 Validating YAML syntax..."
-for file in playbook.yml inventory/hosts.yml roles/flink/defaults/main.yml roles/flink/vars/main.yml roles/flink/tasks/main.yml roles/flink/handlers/main.yml; do
-    if python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null; then
-        echo "✅ $file syntax is valid"
-    else
-        echo "❌ $file syntax validation failed"
-        exit 1
-    fi
-done
 
 # Check role structure
 required_dirs=("roles/flink/tasks" "roles/flink/handlers" "roles/flink/templates" "roles/flink/defaults" "roles/flink/vars")

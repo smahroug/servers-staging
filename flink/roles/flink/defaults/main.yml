@@ -32,7 +32,7 @@ flink_high_availability: false
 flink_checkpointing_interval: "10000"
 
 # Network configuration
-flink_bind_host: "0.0.0.0"
+flink_bind_host: "flink-server"
 flink_jobmanager_bind_host: "{{ flink_bind_host }}"
 flink_taskmanager_bind_host: "{{ flink_bind_host }}"
 

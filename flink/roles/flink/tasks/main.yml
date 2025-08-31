@@ -4,6 +4,10 @@
     update_cache: yes
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
+  retries: 5
+  delay: 15
+  register: update_result
+  until: update_result is succeeded
 
 - name: Check if Java is already installed
   command: which java
@@ -62,10 +66,14 @@
     state: present
 
 - name: Install Java if not already present
-  package:
+  apt:
     name: openjdk-11-jdk
     state: present
   when: not java_installed
+  retries: 5
+  delay: 15
+  register: java_result
+  until: java_result is succeeded
 
 - name: Set default java_home after installation if needed
   set_fact:
@@ -135,6 +143,7 @@
     src: "/opt/flink-{{ flink_version }}"
     dest: "{{ flink_home }}"
     state: link
+    force: true
     owner: "{{ flink_user }}"
     group: "{{ flink_group }}"
   when: not flink_installed.stat.exists
