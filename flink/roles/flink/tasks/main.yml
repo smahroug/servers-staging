@@ -5,15 +5,80 @@
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
 
-- name: Install required packages
+- name: Check if Java is already installed
+  command: which java
+  register: java_check
+  failed_when: false
+  changed_when: false
+
+- name: Detect existing Java installation path
+  shell: |
+    if [ -n "$(which java)" ]; then
+      java_bin=$(which java)
+      # Follow symlinks to get the real java binary
+      while [ -L "$java_bin" ]; do
+        java_bin=$(readlink -f "$java_bin")
+      done
+      # Get JAVA_HOME by going up from bin/java
+      java_home=$(dirname $(dirname "$java_bin"))
+      echo "$java_home"
+    fi
+  register: detected_java_home
+  when: java_check.rc == 0
+  changed_when: false
+
+- name: Check for common Java installation paths if java command not found
+  stat:
+    path: "{{ item }}"
+  register: java_path_check
+  loop:
+    - "/usr/lib/jvm/java-11-openjdk-amd64"
+    - "/usr/lib/jvm/java-8-openjdk-amd64"
+    - "/usr/lib/jvm/default-java"
+    - "/opt/java"
+    - "/usr/java/latest"
+  when: java_check.rc != 0
+
+- name: Set detected Java path from common locations
+  set_fact:
+    detected_java_path_from_common: "{{ item.item }}"
+  when: java_check.rc != 0 and item.stat.exists and item.stat.isdir
+  loop: "{{ java_path_check.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Set Java facts
+  set_fact:
+    java_installed: "{{ java_check.rc == 0 or detected_java_path_from_common is defined }}"
+    detected_java_path: "{{ detected_java_home.stdout | default(detected_java_path_from_common | default('')) }}"
+
+- name: Install required packages (without Java if already installed)
   package:
     name:
       - curl
       - wget
       - tar
-      - openjdk-11-jdk
       - python3
     state: present
+
+- name: Install Java if not already present
+  package:
+    name: openjdk-11-jdk
+    state: present
+  when: not java_installed
+
+- name: Set default java_home after installation if needed
+  set_fact:
+    post_install_java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+  when: not java_installed
+
+- name: Update java_home variable with detected or default path
+  set_fact:
+    java_home: "{{ detected_java_path if detected_java_path != '' else (post_install_java_home | default(java_home)) }}"
+
+- name: Display Java configuration being used
+  debug:
+    msg: "Using Java installation at: {{ java_home }}"
 
 - name: Create flink group
   group:
