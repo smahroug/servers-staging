@@ -1,0 +1,31 @@
+# Production Environment Example Variables
+# Copy this file to roles/flink/vars/main.yml and customize for your environment
+
+---
+# Production Flink configuration with higher memory allocations
+
+# Use latest stable version
+flink_version: "1.18.1"
+
+# Production memory settings for larger workloads
+flink_jobmanager_heap_size: "2048m"
+flink_taskmanager_memory_process_size: "8192m"
+flink_taskmanager_memory_flink_size: "6144m"
+
+# Increase parallelism for production workloads
+flink_parallelism_default: 4
+flink_taskmanager_numberOfTaskSlots: 4
+
+# Enable more frequent checkpointing for production
+flink_checkpointing_interval: "5000"
+
+# Enable high availability for production (requires ZooKeeper)
+# flink_high_availability: true
+# flink_high_availability_storageDir: "hdfs://namenode:port/flink/ha/"
+
+# Production network configuration
+flink_bind_host: "0.0.0.0"
+
+# Service configuration
+flink_start_service: true
+flink_enable_service: true

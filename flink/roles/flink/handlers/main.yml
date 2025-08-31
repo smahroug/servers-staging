@@ -1,0 +1,10 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart flink
+  systemd:
+    name: flink
+    state: restarted
+  when: flink_start_service | default(true)

@@ -1,0 +1,15 @@
+---
+# Environment-specific variables can be overridden here
+# These variables have higher precedence than defaults
+
+# Example: Production environment might use different memory settings
+# flink_jobmanager_heap_size: "2048m"
+# flink_taskmanager_heap_size: "4096m"
+# flink_taskmanager_memory_process_size: "5120m"
+
+# Example: Different Flink version for testing
+# flink_version: "1.17.2"
+
+# Example: High availability configuration for production
+# flink_high_availability: true
+# flink_high_availability_storageDir: "hdfs://namenode:port/flink/ha/"
