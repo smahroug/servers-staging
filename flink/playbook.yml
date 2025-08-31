@@ -1,0 +1,12 @@
+---
+- name: Deploy Apache Flink
+  hosts: flink_servers
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - flink
+  
+  tags:
+    - flink
+    - deployment

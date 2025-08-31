@@ -1,0 +1,132 @@
+---
+- name: Update package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install required packages
+  package:
+    name:
+      - curl
+      - wget
+      - tar
+      - openjdk-11-jdk
+      - python3
+    state: present
+
+- name: Create flink group
+  group:
+    name: "{{ flink_group }}"
+    state: present
+
+- name: Create flink user
+  user:
+    name: "{{ flink_user }}"
+    group: "{{ flink_group }}"
+    system: yes
+    shell: /bin/bash
+    home: "{{ flink_home }}"
+    create_home: no
+    state: present
+
+- name: Create flink directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ flink_user }}"
+    group: "{{ flink_group }}"
+    mode: '0755'
+  loop:
+    - "{{ flink_home }}"
+    - "{{ flink_log_dir }}"
+    - "{{ flink_data_dir }}"
+    - "{{ flink_tmp_dir }}"
+
+- name: Check if Flink is already installed
+  stat:
+    path: "{{ flink_home }}/bin/flink"
+  register: flink_installed
+
+- name: Download Flink
+  get_url:
+    url: "{{ flink_download_url }}"
+    dest: "/tmp/{{ flink_package }}"
+    mode: '0644'
+  when: not flink_installed.stat.exists
+
+- name: Extract Flink
+  unarchive:
+    src: "/tmp/{{ flink_package }}"
+    dest: "/opt"
+    remote_src: yes
+    owner: "{{ flink_user }}"
+    group: "{{ flink_group }}"
+    creates: "{{ flink_home }}/bin/flink"
+  when: not flink_installed.stat.exists
+
+- name: Create symlink for Flink installation
+  file:
+    src: "/opt/flink-{{ flink_version }}"
+    dest: "{{ flink_home }}"
+    state: link
+    owner: "{{ flink_user }}"
+    group: "{{ flink_group }}"
+  when: not flink_installed.stat.exists
+
+- name: Set ownership of Flink directory
+  file:
+    path: "{{ flink_home }}"
+    owner: "{{ flink_user }}"
+    group: "{{ flink_group }}"
+    recurse: yes
+    state: directory
+
+- name: Generate Flink configuration
+  template:
+    src: flink-conf.yaml.j2
+    dest: "{{ flink_config_dir }}/flink-conf.yaml"
+    owner: "{{ flink_user }}"
+    group: "{{ flink_group }}"
+    mode: '0644'
+    backup: yes
+  notify:
+    - restart flink
+
+- name: Create Flink systemd service file
+  template:
+    src: flink.service.j2
+    dest: /etc/systemd/system/flink.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart flink
+
+- name: Set JAVA_HOME environment
+  lineinfile:
+    path: "{{ flink_home }}/conf/flink-conf.yaml"
+    line: "env.java.home: {{ java_home }}"
+    create: yes
+  notify:
+    - restart flink
+
+- name: Clean up downloaded package
+  file:
+    path: "/tmp/{{ flink_package }}"
+    state: absent
+
+- name: Start and enable Flink service
+  systemd:
+    name: flink
+    state: "{{ 'started' if flink_start_service else 'stopped' }}"
+    enabled: "{{ flink_enable_service }}"
+    daemon_reload: yes
+  when: flink_role is defined and flink_role == 'master'
+
+- name: Start and enable Flink TaskManager service
+  systemd:
+    name: flink
+    state: "{{ 'started' if flink_start_service else 'stopped' }}"
+    enabled: "{{ flink_enable_service }}"
+    daemon_reload: yes
+  when: flink_role is defined and flink_role == 'worker'

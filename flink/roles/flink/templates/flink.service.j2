@@ -1,0 +1,44 @@
+[Unit]
+Description=Apache Flink
+Documentation=https://flink.apache.org/
+After=network.target
+
+[Service]
+Type=forking
+User={{ flink_user }}
+Group={{ flink_group }}
+Environment=JAVA_HOME={{ java_home }}
+Environment=FLINK_HOME={{ flink_home }}
+Environment=FLINK_CONF_DIR={{ flink_config_dir }}
+Environment=FLINK_LOG_DIR={{ flink_log_dir }}
+WorkingDirectory={{ flink_home }}
+
+{% if flink_role is defined and flink_role == 'master' %}
+ExecStart={{ flink_home }}/bin/start-cluster.sh
+ExecStop={{ flink_home }}/bin/stop-cluster.sh
+{% else %}
+ExecStart={{ flink_home }}/bin/taskmanager.sh start
+ExecStop={{ flink_home }}/bin/taskmanager.sh stop
+{% endif %}
+
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Create necessary directories
+ExecStartPre=/bin/mkdir -p {{ flink_log_dir }}
+ExecStartPre=/bin/mkdir -p {{ flink_data_dir }}
+ExecStartPre=/bin/mkdir -p {{ flink_tmp_dir }}
+ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_log_dir }}
+ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_data_dir }}
+ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_tmp_dir }}
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }}
+
+[Install]
+WantedBy=multi-user.target

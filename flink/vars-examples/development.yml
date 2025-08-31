@@ -1,0 +1,30 @@
+# Development Environment Example Variables
+# Copy this file to roles/flink/vars/main.yml and customize for your environment
+
+---
+# Development Flink configuration with minimal resource usage
+
+# Use current stable version
+flink_version: "1.18.1"
+
+# Development memory settings for smaller workloads
+flink_jobmanager_heap_size: "512m"
+flink_taskmanager_memory_process_size: "1024m"
+flink_taskmanager_memory_flink_size: "768m"
+
+# Lower parallelism for development
+flink_parallelism_default: 1
+flink_taskmanager_numberOfTaskSlots: 2
+
+# Less frequent checkpointing for development
+flink_checkpointing_interval: "30000"
+
+# Disable high availability for development
+flink_high_availability: false
+
+# Development network configuration
+flink_bind_host: "0.0.0.0"
+
+# Service configuration
+flink_start_service: true
+flink_enable_service: true

@@ -1,0 +1,41 @@
+---
+# Flink version and download settings
+flink_version: "2.1.0"
+flink_scala_version: "2.12"
+flink_package: "flink-{{ flink_version }}-bin-scala_{{ flink_scala_version }}.tgz"
+flink_download_url: "https://archive.apache.org/dist/flink/flink-{{ flink_version }}/{{ flink_package }}"
+
+# Installation directories
+flink_user: "flink"
+flink_group: "flink"
+flink_home: "/opt/flink"
+flink_config_dir: "{{ flink_home }}/conf"
+flink_log_dir: "/var/log/flink"
+flink_data_dir: "/var/lib/flink"
+flink_tmp_dir: "/tmp/flink"
+
+# Java settings
+java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+
+# Flink configuration
+flink_jobmanager_rpc_port: 6123
+flink_jobmanager_heap_size: "1024m"
+flink_taskmanager_heap_size: "1024m"
+flink_taskmanager_memory_process_size: "1728m"
+flink_taskmanager_memory_flink_size: "1280m"
+flink_parallelism_default: 1
+flink_taskmanager_numberOfTaskSlots: 1
+
+# Cluster configuration
+flink_cluster_mode: "standalone"  # standalone or kubernetes or yarn
+flink_high_availability: false
+flink_checkpointing_interval: "10000"
+
+# Network configuration
+flink_bind_host: "0.0.0.0"
+flink_jobmanager_bind_host: "{{ flink_bind_host }}"
+flink_taskmanager_bind_host: "{{ flink_bind_host }}"
+
+# Service configuration
+flink_start_service: true
+flink_enable_service: true
