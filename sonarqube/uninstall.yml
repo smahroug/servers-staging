@@ -1,0 +1,82 @@
+---
+- name: Uninstall SonarQube
+  hosts: sonarqube_servers
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Stop SonarQube service
+      systemd:
+        name: sonarqube
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable SonarQube service
+      systemd:
+        name: sonarqube
+        enabled: no
+      ignore_errors: yes
+
+    - name: Remove SonarQube systemd service file
+      file:
+        path: /etc/systemd/system/sonarqube.service
+        state: absent
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Remove SonarQube symlink
+      file:
+        path: /opt/sonarqube
+        state: absent
+
+    - name: Remove SonarQube installation directory
+      file:
+        path: "/opt/sonarqube-{{ sonarqube_version | default('10.6.0.92116') }}"
+        state: absent
+
+    - name: Remove SonarQube data directory
+      file:
+        path: /var/lib/sonarqube
+        state: absent
+
+    - name: Remove SonarQube log directory
+      file:
+        path: /var/log/sonarqube
+        state: absent
+
+    - name: Remove SonarQube temp directory
+      file:
+        path: /var/tmp/sonarqube
+        state: absent
+
+    - name: Remove sonarqube user
+      user:
+        name: sonarqube
+        state: absent
+        remove: yes
+
+    - name: Remove sonarqube group
+      group:
+        name: sonarqube
+        state: absent
+
+    - name: Remove system limits for sonarqube user
+      lineinfile:
+        path: /etc/security/limits.conf
+        regexp: '^sonarqube\s+'
+        state: absent
+
+    - name: Display uninstallation summary
+      debug:
+        msg: |
+          SonarQube has been successfully uninstalled.
+          Removed:
+          - SonarQube service
+          - /opt/sonarqube and /opt/sonarqube-*
+          - /var/lib/sonarqube
+          - /var/log/sonarqube
+          - /var/tmp/sonarqube
+          - sonarqube user and group
+          - System limits configuration
