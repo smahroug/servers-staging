@@ -1,0 +1,45 @@
+[Unit]
+Description=SonarQube - Static Code Analysis Platform
+Documentation=https://docs.sonarsource.com/sonarqube/
+After=network.target
+After=syslog.target
+
+[Service]
+Type=forking
+User={{ sonarqube_user }}
+Group={{ sonarqube_group }}
+Environment=JAVA_HOME={{ java_home }}
+Environment=SONAR_HOME={{ sonarqube_home }}
+WorkingDirectory={{ sonarqube_home }}
+
+ExecStart={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh start
+ExecStop={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh stop
+ExecReload={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh restart
+
+PIDFile={{ sonarqube_home }}/bin/linux-x86-64/SonarQube.pid
+
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Create necessary directories
+ExecStartPre=/bin/mkdir -p {{ sonarqube_data_dir }}
+ExecStartPre=/bin/mkdir -p {{ sonarqube_log_dir }}
+ExecStartPre=/bin/mkdir -p {{ sonarqube_temp_dir }}
+ExecStartPre=/bin/chown -R {{ sonarqube_user }}:{{ sonarqube_group }} {{ sonarqube_data_dir }}
+ExecStartPre=/bin/chown -R {{ sonarqube_user }}:{{ sonarqube_group }} {{ sonarqube_log_dir }}
+ExecStartPre=/bin/chown -R {{ sonarqube_user }}:{{ sonarqube_group }} {{ sonarqube_temp_dir }}
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ReadWritePaths={{ sonarqube_data_dir }} {{ sonarqube_log_dir }} {{ sonarqube_temp_dir }}
+
+# Limits
+LimitNOFILE={{ sonarqube_es_nofile_limit }}
+LimitNPROC={{ sonarqube_es_nproc_limit }}
+
+[Install]
+WantedBy=multi-user.target

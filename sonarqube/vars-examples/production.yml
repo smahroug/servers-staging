@@ -1,0 +1,29 @@
+# Production Environment Example Variables
+# Copy this file to roles/sonarqube/vars/main.yml and customize for your environment
+
+---
+# Production SonarQube configuration with higher memory allocations
+
+# Use latest stable version
+sonarqube_version: "10.6.0.92116"
+
+# Production memory settings for larger workloads
+sonarqube_web_java_opts: "-Xms1024m -Xmx4096m -XX:+HeapDumpOnOutOfMemoryError"
+sonarqube_ce_java_opts: "-Xms1024m -Xmx4096m -XX:+HeapDumpOnOutOfMemoryError"
+sonarqube_es_java_opts: "-Xms1024m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError"
+
+# Use PostgreSQL for production
+sonarqube_db_type: "postgresql"
+sonarqube_db_host: "localhost"
+sonarqube_db_port: 5432
+sonarqube_db_name: "sonarqube"
+sonarqube_db_user: "sonarqube"
+sonarqube_db_password: "change_me"
+
+# Production network configuration
+sonarqube_web_host: "0.0.0.0"
+sonarqube_web_port: 9000
+
+# Service configuration
+sonarqube_start_service: true
+sonarqube_enable_service: true
