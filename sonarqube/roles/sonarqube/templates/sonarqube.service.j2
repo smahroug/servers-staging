@@ -16,6 +16,8 @@ ExecStart={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh start
 ExecStop={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh stop
 ExecReload={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh restart
 
+PIDFile={{ sonarqube_home }}/bin/linux-x86-64/SonarQube.pid
+
 Restart=on-failure
 RestartSec=30
 TimeoutStartSec=300
@@ -31,6 +33,9 @@ ExecStartPre=/bin/chown -R {{ sonarqube_user }}:{{ sonarqube_group }} {{ sonarqu
 
 # Security settings
 NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ReadWritePaths={{ sonarqube_data_dir }} {{ sonarqube_log_dir }} {{ sonarqube_temp_dir }}
 
 # Limits
 LimitNOFILE={{ sonarqube_es_nofile_limit }}

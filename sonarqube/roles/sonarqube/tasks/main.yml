@@ -19,57 +19,9 @@
       - acl
     state: present
 
-# PostgreSQL installation and configuration
-- name: Install PostgreSQL
-  apt:
-    name:
-      - postgresql
-      - postgresql-client
-      - python3-psycopg2
-    state: present
-    update_cache: yes
-  when: sonarqube_db_type == "postgresql"
-  retries: 5
-  delay: 15
-  register: pg_install
-  until: pg_install is succeeded
-
-- name: Ensure PostgreSQL is running and enabled
-  systemd:
-    name: postgresql
-    state: started
-    enabled: yes
-  when: sonarqube_db_type == "postgresql"
-
-- name: Create SonarQube database user
-  become_user: postgres
-  postgresql_user:
-    name: "{{ sonarqube_db_user }}"
-    password: "{{ sonarqube_db_password }}"
-  when: sonarqube_db_type == "postgresql"
-
-- name: Create SonarQube database
-  become_user: postgres
-  postgresql_db:
-    name: "{{ sonarqube_db_name }}"
-    owner: "{{ sonarqube_db_user }}"
-    encoding: UTF-8
-    template: template0
-    lc_collate: en_US.UTF-8
-    lc_ctype: en_US.UTF-8
-  when: sonarqube_db_type == "postgresql"
-
-
 - name: Check if Java is already installed
   command: which java
   register: java_check
-  failed_when: false
-  changed_when: false
-
-- name: Check Java version
-  shell: java -version 2>&1 | grep -oP 'version "\K[0-9]+' | head -1
-  register: java_version_check
-  when: java_check.rc == 0
   failed_when: false
   changed_when: false
 
@@ -87,34 +39,36 @@
   when: java_check.rc == 0
   changed_when: false
 
-- name: Check for common Java 17 installation paths
+- name: Check for common Java installation paths if java command not found
   stat:
     path: "{{ item }}"
-  register: java17_path_check
+  register: java_path_check
   loop:
     - "/usr/lib/jvm/java-17-openjdk-amd64"
-    - "/usr/lib/jvm/java-17-openjdk-arm64"
-  when: java_check.rc != 0 or (java_version_check.stdout | default('0') | int) < 17
+    - "/usr/lib/jvm/java-11-openjdk-amd64"
+    - "/usr/lib/jvm/default-java"
+    - "/opt/java"
+    - "/usr/java/latest"
+  when: java_check.rc != 0
 
-- name: Set detected Java 17 path from common locations
+- name: Set detected Java path from common locations
   set_fact:
-    detected_java17_path: "{{ item.item }}"
-  when: (java_check.rc != 0 or (java_version_check.stdout | default('0') | int) < 17) and item.stat.exists and item.stat.isdir
-  loop: "{{ java17_path_check.results | default([]) }}"
+    detected_java_path_from_common: "{{ item.item }}"
+  when: java_check.rc != 0 and item.stat.exists and item.stat.isdir
+  loop: "{{ java_path_check.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
 
 - name: Set Java facts
   set_fact:
-    java_version_ok: "{{ java_check.rc == 0 and (java_version_check.stdout | default('0') | int) >= 17 }}"
-    java17_found: "{{ detected_java17_path is defined }}"
-    detected_java_path: "{{ detected_java17_path | default(detected_java_home.stdout | default('')) }}"
+    java_installed: "{{ java_check.rc == 0 or detected_java_path_from_common is defined }}"
+    detected_java_path: "{{ detected_java_home.stdout | default(detected_java_path_from_common | default('')) }}"
 
-- name: Install Java 17 if needed
+- name: Install Java 17 if not already present
   apt:
     name: openjdk-17-jdk
     state: present
-  when: not java_version_ok and not java17_found
+  when: not java_installed
   retries: 5
   delay: 15
   register: java_result
@@ -122,8 +76,8 @@
 
 - name: Set default java_home after installation if needed
   set_fact:
-    post_install_java_home: "/usr/lib/jvm/java-17-openjdk-arm64"
-  when: not java_version_ok and not java17_found
+    post_install_java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
+  when: not java_installed
 
 - name: Update java_home variable with detected or default path
   set_fact:
