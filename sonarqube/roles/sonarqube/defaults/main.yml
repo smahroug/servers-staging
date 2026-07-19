@@ -1,0 +1,47 @@
+---
+# SonarQube version and download settings
+sonarqube_version: "10.6.0.92116"
+sonarqube_edition: "community"
+sonarqube_package: "sonarqube-{{ sonarqube_version }}.zip"
+sonarqube_download_url: "https://binaries.sonarsource.com/Distribution/sonarqube/{{ sonarqube_package }}"
+
+# Installation directories
+sonarqube_user: "sonarqube"
+sonarqube_group: "sonarqube"
+sonarqube_home: "/opt/sonarqube"
+sonarqube_data_dir: "/var/lib/sonarqube"
+sonarqube_log_dir: "/var/log/sonarqube"
+sonarqube_temp_dir: "/var/tmp/sonarqube"
+
+# Java settings
+java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
+
+# Database settings (embedded H2 for testing, PostgreSQL for production)
+sonarqube_db_type: "postgresql"  # h2 or postgresql
+sonarqube_db_host: "localhost"
+sonarqube_db_port: 5432
+sonarqube_db_name: "sonarqube"
+sonarqube_db_user: "sonarqube"
+sonarqube_db_password: "sonarqube"
+
+# Web server settings
+sonarqube_web_host: "0.0.0.0"
+sonarqube_web_port: 9000
+sonarqube_web_context: "/"
+
+# Elasticsearch settings
+sonarqube_es_host: "127.0.0.1"
+sonarqube_es_port: 9001
+
+# JVM settings
+sonarqube_web_java_opts: "-Xms512m -Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"
+sonarqube_ce_java_opts: "-Xms512m -Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"
+sonarqube_es_java_opts: "-Xms512m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError"
+
+# Service configuration
+sonarqube_start_service: true
+sonarqube_enable_service: true
+
+# System limits for Elasticsearch
+sonarqube_es_nofile_limit: 65536
+sonarqube_es_nproc_limit: 4096

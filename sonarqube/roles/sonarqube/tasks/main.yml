@@ -1,0 +1,206 @@
+---
+- name: Update package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  retries: 5
+  delay: 15
+  register: update_result
+  until: update_result is succeeded
+
+- name: Install required system packages
+  package:
+    name:
+      - curl
+      - wget
+      - unzip
+      - python3
+      - acl
+    state: present
+
+- name: Check if Java is already installed
+  command: which java
+  register: java_check
+  failed_when: false
+  changed_when: false
+
+- name: Detect existing Java installation path
+  shell: |
+    if [ -n "$(which java)" ]; then
+      java_bin=$(which java)
+      while [ -L "$java_bin" ]; do
+        java_bin=$(readlink -f "$java_bin")
+      done
+      java_home=$(dirname $(dirname "$java_bin"))
+      echo "$java_home"
+    fi
+  register: detected_java_home
+  when: java_check.rc == 0
+  changed_when: false
+
+- name: Check for common Java installation paths if java command not found
+  stat:
+    path: "{{ item }}"
+  register: java_path_check
+  loop:
+    - "/usr/lib/jvm/java-17-openjdk-amd64"
+    - "/usr/lib/jvm/java-11-openjdk-amd64"
+    - "/usr/lib/jvm/default-java"
+    - "/opt/java"
+    - "/usr/java/latest"
+  when: java_check.rc != 0
+
+- name: Set detected Java path from common locations
+  set_fact:
+    detected_java_path_from_common: "{{ item.item }}"
+  when: java_check.rc != 0 and item.stat.exists and item.stat.isdir
+  loop: "{{ java_path_check.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Set Java facts
+  set_fact:
+    java_installed: "{{ java_check.rc == 0 or detected_java_path_from_common is defined }}"
+    detected_java_path: "{{ detected_java_home.stdout | default(detected_java_path_from_common | default('')) }}"
+
+- name: Install Java 17 if not already present
+  apt:
+    name: openjdk-17-jdk
+    state: present
+  when: not java_installed
+  retries: 5
+  delay: 15
+  register: java_result
+  until: java_result is succeeded
+
+- name: Set default java_home after installation if needed
+  set_fact:
+    post_install_java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
+  when: not java_installed
+
+- name: Update java_home variable with detected or default path
+  set_fact:
+    java_home: "{{ detected_java_path if detected_java_path != '' else (post_install_java_home | default(java_home)) }}"
+
+- name: Display Java configuration being used
+  debug:
+    msg: "Using Java installation at: {{ java_home }}"
+
+- name: Create sonarqube group
+  group:
+    name: "{{ sonarqube_group }}"
+    state: present
+
+- name: Create sonarqube user
+  user:
+    name: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    system: yes
+    shell: /bin/bash
+    home: "{{ sonarqube_home }}"
+    create_home: no
+    state: present
+
+- name: Create sonarqube directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    mode: '0755'
+  loop:
+    - "{{ sonarqube_home }}"
+    - "{{ sonarqube_data_dir }}"
+    - "{{ sonarqube_log_dir }}"
+    - "{{ sonarqube_temp_dir }}"
+
+- name: Check if SonarQube is already installed
+  stat:
+    path: "{{ sonarqube_home }}/bin/linux-x86-64/sonar.sh"
+  register: sonarqube_installed
+
+- name: Download SonarQube
+  get_url:
+    url: "{{ sonarqube_download_url }}"
+    dest: "/tmp/{{ sonarqube_package }}"
+    mode: '0644'
+  when: not sonarqube_installed.stat.exists
+
+- name: Extract SonarQube
+  unarchive:
+    src: "/tmp/{{ sonarqube_package }}"
+    dest: "/opt"
+    remote_src: yes
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    creates: "{{ sonarqube_home }}/bin/linux-x86-64/sonar.sh"
+  when: not sonarqube_installed.stat.exists
+
+- name: Create symlink for SonarQube installation
+  file:
+    src: "/opt/sonarqube-{{ sonarqube_version }}"
+    dest: "{{ sonarqube_home }}"
+    state: link
+    force: true
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+  when: not sonarqube_installed.stat.exists
+
+- name: Set ownership of SonarQube directory
+  file:
+    path: "{{ sonarqube_home }}"
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    recurse: yes
+    state: directory
+
+- name: Generate SonarQube properties configuration
+  template:
+    src: sonar.properties.j2
+    dest: "{{ sonarqube_home }}/conf/sonar.properties"
+    owner: "{{ sonarqube_user }}"
+    group: "{{ sonarqube_group }}"
+    mode: '0644'
+    backup: yes
+  notify:
+    - restart sonarqube
+
+- name: Configure SonarQube wrapper (JVM settings)
+  template:
+    src: sonarqube.service.j2
+    dest: /etc/systemd/system/sonarqube.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart sonarqube
+
+- name: Set system limits for sonarqube user (Elasticsearch requirements)
+  lineinfile:
+    path: /etc/security/limits.conf
+    line: "{{ item }}"
+    create: yes
+  loop:
+    - "{{ sonarqube_user }}   soft    nofile  {{ sonarqube_es_nofile_limit }}"
+    - "{{ sonarqube_user }}   hard    nofile  {{ sonarqube_es_nofile_limit }}"
+    - "{{ sonarqube_user }}   soft    nproc   {{ sonarqube_es_nproc_limit }}"
+    - "{{ sonarqube_user }}   hard    nproc   {{ sonarqube_es_nproc_limit }}"
+
+- name: Set vm.max_map_count for Elasticsearch
+  sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    state: present
+    reload: yes
+
+- name: Clean up downloaded package
+  file:
+    path: "/tmp/{{ sonarqube_package }}"
+    state: absent
+
+- name: Start and enable SonarQube service
+  systemd:
+    name: sonarqube
+    state: "{{ 'started' if sonarqube_start_service else 'stopped' }}"
+    enabled: "{{ sonarqube_enable_service }}"
+    daemon_reload: yes

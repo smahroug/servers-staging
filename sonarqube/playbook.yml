@@ -1,0 +1,12 @@
+---
+- name: Deploy SonarQube
+  hosts: sonarqube_servers
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - sonarqube
+
+  tags:
+    - sonarqube
+    - deployment

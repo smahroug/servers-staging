@@ -1,0 +1,24 @@
+# Development Environment Example Variables
+# Copy this file to roles/sonarqube/vars/main.yml and customize for your environment
+
+---
+# Development SonarQube configuration with minimal resource usage
+
+# Use current stable version
+sonarqube_version: "10.6.0.92116"
+
+# Development memory settings for smaller workloads
+sonarqube_web_java_opts: "-Xms256m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError"
+sonarqube_ce_java_opts: "-Xms256m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError"
+sonarqube_es_java_opts: "-Xms256m -Xmx256m -XX:+HeapDumpOnOutOfMemoryError"
+
+# Use embedded H2 database for development
+sonarqube_db_type: "h2"
+
+# Development network configuration
+sonarqube_web_host: "0.0.0.0"
+sonarqube_web_port: 9000
+
+# Service configuration
+sonarqube_start_service: true
+sonarqube_enable_service: true
