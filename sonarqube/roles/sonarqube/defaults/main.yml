@@ -17,7 +17,7 @@ sonarqube_temp_dir: "/var/tmp/sonarqube"
 java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
 
 # Database settings (embedded H2 for testing, PostgreSQL for production)
-sonarqube_db_type: "postgresql"  # h2 or postgresql
+sonarqube_db_type: "h2"  # h2 or postgresql
 sonarqube_db_host: "localhost"
 sonarqube_db_port: 5432
 sonarqube_db_name: "sonarqube"
