@@ -25,6 +25,7 @@ Restart=on-failure
 RestartSec=10
 TimeoutStartSec=300
 TimeoutStopSec=120
+RemainAfterExit=yes
 
 # Create necessary directories
 ExecStartPre=/bin/mkdir -p {{ flink_log_dir }}
@@ -36,13 +37,12 @@ ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_tmp_dir }
 
 # Security settings
 NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-ReadWritePaths={{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }}
+ReadWritePaths={{ flink_home }} {{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }}
 
 # Resource limits
 LimitNOFILE=65536

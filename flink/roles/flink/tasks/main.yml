@@ -15,23 +15,31 @@
   failed_when: false
   changed_when: false
 
-- name: Detect existing Java installation path
+- name: Check Java version
   shell: |
-    if [ -n "$(which java)" ]; then
-      java_bin=$(which java)
-      # Follow symlinks to get the real java binary
-      while [ -L "$java_bin" ]; do
-        java_bin=$(readlink -f "$java_bin")
-      done
-      # Get JAVA_HOME by going up from bin/java
-      java_home=$(dirname $(dirname "$java_bin"))
-      echo "$java_home"
-    fi
-  register: detected_java_home
+    java -version 2>&1 | grep -oP 'version "\K[0-9]+' || echo "0"
+  register: java_version_major
   when: java_check.rc == 0
   changed_when: false
 
-- name: Check for common Java installation paths if java command not found
+- name: Set Java facts
+  set_fact:
+    java_installed: "{{ java_check.rc == 0 and (java_version_major.stdout | int) >= 21 }}"
+    java_version_ok: "{{ java_check.rc == 0 and (java_version_major.stdout | int) >= 21 }}"
+
+- name: Detect existing Java 21+ installation path
+  shell: |
+    java_bin=$(which java)
+    while [ -L "$java_bin" ]; do
+      java_bin=$(readlink -f "$java_bin")
+    done
+    java_home=$(dirname $(dirname "$java_bin"))
+    echo "$java_home"
+  register: detected_java_home
+  when: java_version_ok
+  changed_when: false
+
+- name: Check for common Java 21 installation paths if no compatible Java found
   stat:
     path: "{{ item }}"
   register: java_path_check
@@ -41,39 +49,21 @@
     - "/usr/lib/jvm/default-java"
     - "/opt/java"
     - "/usr/java/latest"
-  when: java_check.rc != 0
+  when: not java_version_ok
 
 - name: Set detected Java path from common locations
   set_fact:
     detected_java_path_from_common: "{{ item.item }}"
-  when: java_check.rc != 0 and item.stat.exists and item.stat.isdir
+  when: not java_version_ok and item.stat.exists and item.stat.isdir
   loop: "{{ java_path_check.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
 
-- name: Set Java facts
-  set_fact:
-    java_installed: "{{ java_check.rc == 0 or detected_java_path_from_common is defined }}"
-    detected_java_path: "{{ detected_java_home.stdout | default(detected_java_path_from_common | default('')) }}"
-
-- name: Install required packages (without Java if already installed)
-  package:
-    name:
-      - curl
-      - wget
-      - tar
-      - python3
-    state: present
-  retries: 5
-  delay: 15
-  register: package_result
-  until: package_result is succeeded
-
-- name: Install Java if not already present
+- name: Install Java 21 if not already present
   apt:
     name: openjdk-21-jdk
     state: present
-  when: not java_installed
+  when: not java_version_ok
   retries: 5
   delay: 15
   register: java_result
@@ -82,11 +72,11 @@
 - name: Set default java_home after installation if needed
   set_fact:
     post_install_java_home: "/usr/lib/jvm/java-21-openjdk-amd64"
-  when: not java_installed
+  when: not java_version_ok
 
 - name: Update java_home variable with detected or default path
   set_fact:
-    java_home: "{{ detected_java_path if detected_java_path != '' else (post_install_java_home | default(java_home)) }}"
+    java_home: "{{ detected_java_home.stdout if detected_java_home.stdout is defined and detected_java_home.stdout != '' else (detected_java_path_from_common | default(post_install_java_home | default(java_home))) }}"
 
 - name: Display Java configuration being used
   debug:
@@ -126,16 +116,14 @@
   register: flink_installed
 
 - name: Download Flink
-  get_url:
-    url: "{{ flink_download_url }}"
-    dest: "/tmp/{{ flink_package }}"
-    mode: '0644'
-    timeout: 600
+  shell: |
+    wget --show-progress --progress=bar:force:noscroll -O "/tmp/{{ flink_package }}" "{{ flink_download_url }}"
+  args:
+    creates: "/tmp/{{ flink_package }}"
   when: not flink_installed.stat.exists
-  retries: 3
-  delay: 10
+  async: 1200
+  poll: 10
   register: download_result
-  until: download_result is succeeded
 
 - name: Check if downloaded Flink package exists
   stat:

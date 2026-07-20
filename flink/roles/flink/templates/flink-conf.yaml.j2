@@ -30,7 +30,7 @@
 {% if flink_role is defined and flink_role == 'master' %}
 jobmanager.rpc.address: {{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses[0]) }}
 {% else %}
-jobmanager.rpc.address: {{ hostvars[groups['flink_servers'] | select('match', '.*master.*') | first]['ansible_default_ipv4']['address'] }}
+jobmanager.rpc.address: {{ hostvars['flink-master']['ansible_host'] }}
 {% endif %}
 
 # The RPC port where the JobManager is reachable.
