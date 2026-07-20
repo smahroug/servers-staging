@@ -176,7 +176,7 @@ rest.ssl.truststore-password: {{ flink_web_ssl_truststore_password }}
 
 # The address to which the REST client will connect to
 #
-rest.address: flink-server
+rest.address: {{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses[0]) }}
 
 # Port range for the REST and web server to bind to.
 #
@@ -184,7 +184,7 @@ rest.bind-port: 8081
 
 # The address that the REST & web server binds to
 #
-rest.bind-address: flink-server
+rest.bind-address: 0.0.0.0
 
 # Flag to specify whether job submission is enabled from the web-ui
 #
