@@ -232,8 +232,8 @@
   wait_for:
     port: "{{ flink_jobmanager_rpc_port }}"
     host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
-    delay: 10
-    timeout: 60
+    delay: 15
+    timeout: 120
   when: flink_role is defined and flink_role == 'master' and flink_start_service and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
 
 - name: Wait for Flink Web UI to be available
@@ -241,7 +241,7 @@
     port: '8081'
     host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
     delay: 5
-    timeout: 30
+    timeout: 60
   when: flink_role is defined and flink_role == 'master' and flink_start_service and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
 
 - name: Verify Flink installation
