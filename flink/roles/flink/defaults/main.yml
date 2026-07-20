@@ -15,7 +15,7 @@ flink_data_dir: "/var/lib/flink"
 flink_tmp_dir: "/tmp/flink"
 
 # Java settings
-java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+java_home: "/usr/lib/jvm/java-21-openjdk-amd64"
 
 # Flink configuration
 flink_jobmanager_rpc_port: 6123

@@ -36,8 +36,8 @@
     path: "{{ item }}"
   register: java_path_check
   loop:
-    - "/usr/lib/jvm/java-11-openjdk-amd64"
-    - "/usr/lib/jvm/java-8-openjdk-amd64"
+    - "/usr/lib/jvm/java-21-openjdk-amd64"
+    - "/usr/lib/jvm/java-17-openjdk-amd64"
     - "/usr/lib/jvm/default-java"
     - "/opt/java"
     - "/usr/java/latest"
@@ -71,7 +71,7 @@
 
 - name: Install Java if not already present
   apt:
-    name: openjdk-11-jdk
+    name: openjdk-21-jdk
     state: present
   when: not java_installed
   retries: 5
@@ -81,7 +81,7 @@
 
 - name: Set default java_home after installation if needed
   set_fact:
-    post_install_java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+    post_install_java_home: "/usr/lib/jvm/java-21-openjdk-amd64"
   when: not java_installed
 
 - name: Update java_home variable with detected or default path
@@ -250,7 +250,7 @@
 
 - name: Wait for Flink Web UI to be available
   wait_for:
-    port: 8081
+    port: '8081'
     host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
     delay: 5
     timeout: 30
