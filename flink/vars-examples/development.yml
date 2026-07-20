@@ -5,7 +5,7 @@
 # Development Flink configuration with minimal resource usage
 
 # Use current stable version
-flink_version: "1.18.1"
+flink_version: "2.3.0"
 
 # Development memory settings for smaller workloads
 flink_jobmanager_heap_size: "512m"

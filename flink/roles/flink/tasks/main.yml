@@ -130,12 +130,18 @@
     url: "{{ flink_download_url }}"
     dest: "/tmp/{{ flink_package }}"
     mode: '0644'
-    timeout: 60
+    timeout: 600
   when: not flink_installed.stat.exists
   retries: 3
   delay: 10
   register: download_result
   until: download_result is succeeded
+
+- name: Check if downloaded Flink package exists
+  stat:
+    path: "/tmp/{{ flink_package }}"
+  register: flink_package_stat
+  when: not flink_installed.stat.exists
 
 - name: Extract Flink
   unarchive:
@@ -145,7 +151,7 @@
     owner: "{{ flink_user }}"
     group: "{{ flink_group }}"
     creates: "{{ flink_home }}/bin/flink"
-  when: not flink_installed.stat.exists
+  when: not flink_installed.stat.exists and (flink_package_stat.stat.exists | default(false))
 
 - name: Create symlink for Flink installation
   file:
@@ -155,7 +161,7 @@
     force: true
     owner: "{{ flink_user }}"
     group: "{{ flink_group }}"
-  when: not flink_installed.stat.exists
+  when: not flink_installed.stat.exists and (flink_package_stat.stat.exists | default(false))
 
 - name: Set ownership of Flink directory
   file:
@@ -164,6 +170,7 @@
     group: "{{ flink_group }}"
     recurse: yes
     state: directory
+  when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
 - name: Generate Flink configuration
   template:
@@ -175,6 +182,7 @@
     backup: yes
   notify:
     - restart flink
+  when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
 - name: Create Flink systemd service file
   template:
@@ -192,6 +200,7 @@
     create: yes
   notify:
     - restart flink
+  when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
 - name: Configure log rotation for Flink logs
   copy:
@@ -221,7 +230,7 @@
     state: "{{ 'started' if flink_start_service else 'stopped' }}"
     enabled: "{{ flink_enable_service }}"
     daemon_reload: yes
-  when: flink_role is defined and flink_role == 'master'
+  when: flink_role is defined and flink_role == 'master' and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
 
 - name: Start and enable Flink TaskManager service
   systemd:
@@ -229,7 +238,7 @@
     state: "{{ 'started' if flink_start_service else 'stopped' }}"
     enabled: "{{ flink_enable_service }}"
     daemon_reload: yes
-  when: flink_role is defined and flink_role == 'worker'
+  when: flink_role is defined and flink_role == 'worker' and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
 
 - name: Wait for Flink service to be active (JobManager)
   wait_for:
@@ -237,7 +246,7 @@
     host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
     delay: 10
     timeout: 60
-  when: flink_role is defined and flink_role == 'master' and flink_start_service
+  when: flink_role is defined and flink_role == 'master' and flink_start_service and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
 
 - name: Wait for Flink Web UI to be available
   wait_for:
@@ -245,14 +254,16 @@
     host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
     delay: 5
     timeout: 30
-  when: flink_role is defined and flink_role == 'master' and flink_start_service
+  when: flink_role is defined and flink_role == 'master' and flink_start_service and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
 
 - name: Verify Flink installation
   command: "{{ flink_home }}/bin/flink --version"
   register: flink_version_check
   changed_when: false
   failed_when: flink_version_check.rc != 0
+  when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
 - name: Display Flink version information
   debug:
     msg: "Flink installation verified: {{ flink_version_check.stdout_lines[0] if flink_version_check.stdout_lines else 'Version check failed' }}"
+  when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))

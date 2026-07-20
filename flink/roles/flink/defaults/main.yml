@@ -1,6 +1,6 @@
 ---
 # Flink version and download settings
-flink_version: "1.18.1"
+flink_version: "2.3.0"
 flink_scala_version: "2.12"
 flink_package: "flink-{{ flink_version }}-bin-scala_{{ flink_scala_version }}.tgz"
 flink_download_url: "https://archive.apache.org/dist/flink/flink-{{ flink_version }}/{{ flink_package }}"

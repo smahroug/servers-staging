@@ -1,0 +1,91 @@
+---
+- name: Uninstall Apache Flink
+  hosts: flink_servers
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Stop Flink service
+      systemd:
+        name: flink
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable Flink service
+      systemd:
+        name: flink
+        enabled: no
+      ignore_errors: yes
+
+    - name: Remove Flink systemd service file
+      file:
+        path: /etc/systemd/system/flink.service
+        state: absent
+
+    - name: Remove Flink log rotation configuration
+      file:
+        path: /etc/logrotate.d/flink
+        state: absent
+      ignore_errors: yes
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Remove Flink symlink
+      file:
+        path: "{{ flink_home | default('/opt/flink') }}"
+        state: absent
+
+    - name: Remove Flink installation directory
+      file:
+        path: "/opt/flink-{{ flink_version | default('2.3.0') }}"
+        state: absent
+
+    - name: Remove Flink data directory
+      file:
+        path: "{{ flink_data_dir | default('/var/lib/flink') }}"
+        state: absent
+
+    - name: Remove Flink log directory
+      file:
+        path: "{{ flink_log_dir | default('/var/log/flink') }}"
+        state: absent
+
+    - name: Remove Flink temp directory
+      file:
+        path: "{{ flink_tmp_dir | default('/tmp/flink') }}"
+        state: absent
+
+    - name: Remove downloaded Flink package
+      file:
+        path: "/tmp/{{ flink_package | default('flink-2.3.0-bin-scala_2.12.tgz') }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove flink user
+      user:
+        name: "{{ flink_user | default('flink') }}"
+        state: absent
+        remove: yes
+      ignore_errors: yes
+
+    - name: Remove flink group
+      group:
+        name: "{{ flink_group | default('flink') }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Display uninstallation summary
+      debug:
+        msg: |
+          Flink has been successfully uninstalled.
+          Removed:
+          - Flink service
+          - /opt/flink and /opt/flink-{{ flink_version | default('2.3.0') }}
+          - {{ flink_data_dir | default('/var/lib/flink') }}
+          - {{ flink_log_dir | default('/var/log/flink') }}
+          - {{ flink_tmp_dir | default('/tmp/flink') }}
+          - Log rotation configuration
+          - flink user and group
+

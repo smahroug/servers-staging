@@ -14,23 +14,14 @@ echo "🔍 Running pre-deployment validation..."
 echo ""
 echo "🚀 Starting Flink deployment..."
 
-# Run the playbook with enhanced options
+# Run the playbook
 ansible-playbook -i inventory/hosts.yml playbook.yml \
   --ask-become-pass \
-  --diff \
-  --check-mode || {
-  
-  echo "❌ Dry run failed. Please check the errors above."
-  echo "To proceed anyway, run:"
-  echo "ansible-playbook -i inventory/hosts.yml playbook.yml --ask-become-pass"
+  --diff || {
+
+  echo "❌ Deployment failed. Please check the errors above."
   exit 1
 }
 
 echo ""
-echo "✅ Dry run successful!"
-echo ""
-echo "To execute the deployment, run:"
-echo "ansible-playbook -i inventory/hosts.yml playbook.yml --ask-become-pass"
-echo ""
-echo "For production deployment with vault:"
-echo "ansible-playbook -i inventory/hosts.yml playbook.yml --ask-vault-pass"
+echo "✅ Flink deployment completed!"

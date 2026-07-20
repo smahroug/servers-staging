@@ -7,4 +7,4 @@
   systemd:
     name: flink
     state: restarted
-  when: flink_start_service | default(true)
+  when: not ansible_check_mode and (flink_start_service | default(true))
