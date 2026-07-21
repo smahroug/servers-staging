@@ -16,9 +16,11 @@ WorkingDirectory={{ flink_home }}
 {% if flink_role is defined and flink_role == 'master' %}
 ExecStart={{ flink_home }}/bin/start-cluster.sh
 ExecStop={{ flink_home }}/bin/stop-cluster.sh
+ExecStartPost=/bin/bash -c 'for i in {1..30}; do {{ flink_home }}/bin/flink list 2>/dev/null && exit 0; sleep 2; done; exit 1'
 {% else %}
 ExecStart={{ flink_home }}/bin/taskmanager.sh start
 ExecStop={{ flink_home }}/bin/taskmanager.sh stop
+ExecStartPost=/bin/bash -c 'for i in {1..20}; do pgrep -f "taskexecutor" && exit 0; sleep 2; done; exit 1'
 {% endif %}
 
 Restart=on-failure
@@ -27,14 +29,6 @@ TimeoutStartSec=300
 TimeoutStopSec=120
 RemainAfterExit=yes
 
-# Create necessary directories
-ExecStartPre=/bin/mkdir -p {{ flink_log_dir }}
-ExecStartPre=/bin/mkdir -p {{ flink_data_dir }}
-ExecStartPre=/bin/mkdir -p {{ flink_tmp_dir }}
-ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_log_dir }}
-ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_data_dir }}
-ExecStartPre=/bin/chown -R {{ flink_user }}:{{ flink_group }} {{ flink_tmp_dir }}
-
 # Security settings
 NoNewPrivileges=true
 ProtectSystem=full
@@ -42,7 +36,10 @@ ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-ReadWritePaths={{ flink_home }} {{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }}
+ReadWritePaths={{ flink_home }} {{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }} /tmp
+
+# Process management
+KillMode=mixed
 
 # Resource limits
 LimitNOFILE=65536
