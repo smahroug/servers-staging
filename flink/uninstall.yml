@@ -5,19 +5,70 @@
   gather_facts: yes
 
   tasks:
-    - name: Stop Flink service
+    - name: Stop Flink SQL Gateway service
+      systemd:
+        name: flink-sql-gateway
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable Flink SQL Gateway service
+      systemd:
+        name: flink-sql-gateway
+        enabled: no
+      ignore_errors: yes
+
+    - name: Stop Flink JobManager service
+      systemd:
+        name: flink-jobmanager
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable Flink JobManager service
+      systemd:
+        name: flink-jobmanager
+        enabled: no
+      ignore_errors: yes
+
+    - name: Stop Flink TaskManager service
+      systemd:
+        name: flink-taskmanager
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable Flink TaskManager service
+      systemd:
+        name: flink-taskmanager
+        enabled: no
+      ignore_errors: yes
+
+    - name: Stop Flink service (legacy)
       systemd:
         name: flink
         state: stopped
       ignore_errors: yes
 
-    - name: Disable Flink service
+    - name: Disable Flink service (legacy)
       systemd:
         name: flink
         enabled: no
       ignore_errors: yes
 
-    - name: Remove Flink systemd service file
+    - name: Remove Flink SQL Gateway systemd service file
+      file:
+        path: /etc/systemd/system/flink-sql-gateway.service
+        state: absent
+
+    - name: Remove Flink JobManager systemd service file
+      file:
+        path: /etc/systemd/system/flink-jobmanager.service
+        state: absent
+
+    - name: Remove Flink TaskManager systemd service file
+      file:
+        path: /etc/systemd/system/flink-taskmanager.service
+        state: absent
+
+    - name: Remove Flink systemd service file (legacy)
       file:
         path: /etc/systemd/system/flink.service
         state: absent
@@ -88,4 +139,3 @@
           - {{ flink_tmp_dir | default('/tmp/flink') }}
           - Log rotation configuration
           - flink user and group
-

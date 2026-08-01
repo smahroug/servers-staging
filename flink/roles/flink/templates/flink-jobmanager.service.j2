@@ -1,0 +1,47 @@
+[Unit]
+Description=Apache Flink JobManager
+Documentation=https://flink.apache.org/
+After=network.target
+
+[Service]
+Type=forking
+User={{ flink_user }}
+Group={{ flink_group }}
+Environment=JAVA_HOME={{ java_home }}
+Environment=FLINK_HOME={{ flink_home }}
+Environment=FLINK_CONF_DIR={{ flink_config_dir }}
+Environment=FLINK_LOG_DIR={{ flink_log_dir }}
+WorkingDirectory={{ flink_home }}
+
+ExecStart={{ flink_home }}/bin/jobmanager.sh start
+ExecStop={{ flink_home }}/bin/jobmanager.sh stop
+ExecStartPost=/bin/bash -c 'for i in {1..30}; do {{ flink_home }}/bin/flink list 2>/dev/null && exit 0; sleep 2; done; exit 1'
+
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=120
+RemainAfterExit=yes
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths={{ flink_home }} {{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }} /tmp
+
+# Process management
+KillMode=mixed
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Enhanced restart behavior
+StartLimitInterval=300
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

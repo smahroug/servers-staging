@@ -3,8 +3,20 @@
   systemd:
     daemon_reload: yes
 
-- name: restart flink
+- name: restart flink-jobmanager
   systemd:
-    name: flink
+    name: flink-jobmanager
     state: restarted
   when: not ansible_check_mode and (flink_start_service | default(true))
+
+- name: restart flink-taskmanager
+  systemd:
+    name: flink-taskmanager
+    state: restarted
+  when: not ansible_check_mode and (flink_start_service | default(true))
+
+- name: restart flink-sql-gateway
+  systemd:
+    name: flink-sql-gateway
+    state: restarted
+  when: not ansible_check_mode and (flink_sql_gateway_start_service | default(true))

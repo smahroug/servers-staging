@@ -58,4 +58,21 @@ flink_jvm_heap_dump_path: "{{ flink_log_dir }}"
 # Log configuration
 flink_log_level: "INFO"
 flink_log_max_files: 10
+
 flink_log_max_size: "100MB"
+
+# SQL Gateway configuration
+flink_sql_gateway_enabled: true
+flink_sql_gateway_start_service: true
+flink_sql_gateway_rest_address: "0.0.0.0"
+flink_sql_gateway_rest_port: 8083
+flink_sql_gateway_endpoint_type: "rest"
+flink_sql_gateway_session_check_interval: "1 min"
+flink_sql_gateway_session_idle_timeout: "10 min"
+flink_sql_gateway_session_max_num: 1000000
+flink_sql_gateway_session_plan_cache_enabled: false
+flink_sql_gateway_session_plan_cache_size: 100
+flink_sql_gateway_session_plan_cache_ttl: "1 hour"
+flink_sql_gateway_worker_keepalive_time: "5 min"
+flink_sql_gateway_worker_threads_max: 500
+flink_sql_gateway_worker_threads_min: 5

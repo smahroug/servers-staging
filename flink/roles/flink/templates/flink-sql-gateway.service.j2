@@ -1,0 +1,61 @@
+[Unit]
+Description=Apache Flink SQL Gateway
+Documentation=https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql-gateway/overview/
+After=network.target
+{% if flink_sql_gateway_requires_flink | default(true) %}After=flink-jobmanager.service
+Requires=flink-jobmanager.service{% endif %}
+
+[Service]
+Type=forking
+User={{ flink_user }}
+Group={{ flink_group }}
+Environment=JAVA_HOME={{ java_home }}
+Environment=FLINK_HOME={{ flink_home }}
+Environment=FLINK_CONF_DIR={{ flink_config_dir }}
+Environment=FLINK_LOG_DIR={{ flink_log_dir }}
+WorkingDirectory={{ flink_home }}
+
+ExecStart={{ flink_home }}/bin/sql-gateway.sh start \
+  -Dsql-gateway.endpoint.rest.address={{ flink_sql_gateway_rest_address }} \
+  -Dsql-gateway.endpoint.rest.port={{ flink_sql_gateway_rest_port }} \
+  -Dsql-gateway.endpoint.type={{ flink_sql_gateway_endpoint_type }} \
+  -Dsql-gateway.session.check-interval={{ flink_sql_gateway_session_check_interval }} \
+  -Dsql-gateway.session.idle-timeout={{ flink_sql_gateway_session_idle_timeout }} \
+  -Dsql-gateway.session.max-num={{ flink_sql_gateway_session_max_num }} \
+  -Dsql-gateway.session.plan-cache.enabled={{ flink_sql_gateway_session_plan_cache_enabled | lower }} \
+  -Dsql-gateway.session.plan-cache.size={{ flink_sql_gateway_session_plan_cache_size }} \
+  -Dsql-gateway.session.plan-cache.ttl={{ flink_sql_gateway_session_plan_cache_ttl }} \
+  -Dsql-gateway.worker.keepalive-time={{ flink_sql_gateway_worker_keepalive_time }} \
+  -Dsql-gateway.worker.threads.max={{ flink_sql_gateway_worker_threads_max }} \
+  -Dsql-gateway.worker.threads.min={{ flink_sql_gateway_worker_threads_min }}
+
+ExecStop={{ flink_home }}/bin/sql-gateway.sh stop
+
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=120
+TimeoutStopSec=60
+RemainAfterExit=yes
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths={{ flink_home }} {{ flink_log_dir }} {{ flink_data_dir }} {{ flink_tmp_dir }} /tmp
+
+# Process management
+KillMode=mixed
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Enhanced restart behavior
+StartLimitInterval=300
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

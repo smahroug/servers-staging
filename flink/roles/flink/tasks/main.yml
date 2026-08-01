@@ -169,17 +169,30 @@
     mode: '0644'
     backup: yes
   notify:
-    - restart flink
+    - restart flink-jobmanager
+    - restart flink-taskmanager
   when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
-- name: Create Flink systemd service file
+
+- name: Create Flink JobManager systemd service file
   template:
-    src: flink.service.j2
-    dest: /etc/systemd/system/flink.service
+    src: flink-jobmanager.service.j2
+    dest: /etc/systemd/system/flink-jobmanager.service
     mode: '0644'
   notify:
     - reload systemd
-    - restart flink
+    - restart flink-jobmanager
+  when: flink_role is defined and flink_role == 'master'
+
+- name: Create Flink TaskManager systemd service file
+  template:
+    src: flink-taskmanager.service.j2
+    dest: /etc/systemd/system/flink-taskmanager.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart flink-taskmanager
+  when: flink_role is defined and flink_role == 'worker'
 
 - name: Set JAVA_HOME environment
   lineinfile:
@@ -187,7 +200,8 @@
     line: "env.java.home: {{ java_home }}"
     create: yes
   notify:
-    - restart flink
+    - restart flink-jobmanager
+    - restart flink-taskmanager
   when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
 - name: Configure log rotation for Flink logs
@@ -212,9 +226,9 @@
     path: "/tmp/{{ flink_package }}"
     state: absent
 
-- name: Start and enable Flink service
+- name: Start and enable Flink JobManager service
   systemd:
-    name: flink
+    name: flink-jobmanager
     state: "{{ 'started' if flink_start_service else 'stopped' }}"
     enabled: "{{ flink_enable_service }}"
     daemon_reload: yes
@@ -222,11 +236,45 @@
 
 - name: Start and enable Flink TaskManager service
   systemd:
-    name: flink
+    name: flink-taskmanager
     state: "{{ 'started' if flink_start_service else 'stopped' }}"
     enabled: "{{ flink_enable_service }}"
     daemon_reload: yes
   when: flink_role is defined and flink_role == 'worker' and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
+
+- name: Create Flink SQL Gateway systemd service file
+  template:
+    src: flink-sql-gateway.service.j2
+    dest: /etc/systemd/system/flink-sql-gateway.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart flink-sql-gateway
+  when: flink_sql_gateway_enabled | default(true)
+
+- name: Start and enable Flink SQL Gateway service
+  systemd:
+    name: flink-sql-gateway
+    state: "{{ 'started' if flink_sql_gateway_start_service else 'stopped' }}"
+    enabled: "{{ flink_sql_gateway_start_service }}"
+    daemon_reload: yes
+  when:
+    - flink_sql_gateway_enabled | default(true)
+    - flink_role is defined and flink_role == 'master'
+    - flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
+
+- name: Wait for Flink SQL Gateway REST endpoint to be available
+  wait_for:
+    port: "{{ flink_sql_gateway_rest_port }}"
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 5
+    timeout: 60
+  when:
+    - flink_sql_gateway_enabled | default(true)
+    - flink_role is defined and flink_role == 'master'
+    - flink_sql_gateway_start_service | default(true)
+    - flink_sql_gateway_endpoint_type == 'rest'
+    - flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
 - name: Wait for Flink service to be active (JobManager)
   wait_for:

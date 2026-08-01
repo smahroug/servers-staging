@@ -29,3 +29,12 @@ flink_bind_host: "0.0.0.0"
 # Service configuration
 flink_start_service: true
 flink_enable_service: true
+
+# SQL Gateway configuration
+flink_sql_gateway_enabled: true
+flink_sql_gateway_start_service: true
+flink_sql_gateway_rest_address: "0.0.0.0"
+flink_sql_gateway_rest_port: 8083
+flink_sql_gateway_endpoint_type: "rest"
+flink_sql_gateway_session_idle_timeout: "30 min"
+flink_sql_gateway_session_max_num: 500000
