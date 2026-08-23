@@ -55,6 +55,10 @@ flink_jvm_gc_logging: true
 flink_jvm_heap_dump_on_oom: true
 flink_jvm_heap_dump_path: "{{ flink_log_dir }}"
 
+# Metrics configuration
+flink_metrics_jmx_enabled: true
+flink_metrics_jmx_port: "8789"
+
 # Log configuration
 flink_log_level: "INFO"
 flink_log_max_files: 10

@@ -306,3 +306,14 @@ env.java.opts.taskmanager: -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStam
 {% if flink_jvm_heap_dump_on_oom %}
 env.java.opts.all: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath={{ flink_jvm_heap_dump_path }}
 {% endif %}
+
+#==============================================================================
+# Metrics
+#==============================================================================
+
+{% if flink_metrics_jmx_enabled %}
+# JMX Metrics Reporter
+metrics.reporters: jmx
+metrics.reporter.jmx.factory.class: org.apache.flink.metrics.jmx.JMXReporter
+metrics.reporter.jmx.port: {{ flink_metrics_jmx_port }}
+{% endif %}
