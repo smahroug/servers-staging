@@ -54,11 +54,14 @@ flink_jvm_security_enabled: true
 flink_jvm_gc_logging: true
 flink_jvm_heap_dump_on_oom: true
 flink_jvm_heap_dump_path: "{{ flink_log_dir }}"
+# Required on Java 17+ to allow Flink's JMX server (sun.rmi.registry.RegistryImpl)
+# to start when jmx.server.port is set; without it processes crash with
+# IllegalAccessError: "module java.rmi does not export sun.rmi.*"
+flink_jvm_add_opens: "--add-opens=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.server=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport.tcp=ALL-UNNAMED"
 
 # Metrics configuration
 flink_metrics_jmx_enabled: true
 flink_metrics_jmx_port: "8789"
-flink_metrics_jmx_bind_address: "0.0.0.0"
 
 # Log configuration
 flink_log_level: "INFO"

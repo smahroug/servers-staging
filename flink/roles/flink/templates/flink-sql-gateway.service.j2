@@ -17,6 +17,7 @@ WorkingDirectory={{ flink_home }}
 
 ExecStart={{ flink_home }}/bin/sql-gateway.sh start \
   -Dsql-gateway.endpoint.rest.address={{ flink_sql_gateway_rest_address }} \
+  -Dsql-gateway.endpoint.rest.bind-port={{ flink_sql_gateway_rest_port }} \
   -Dsql-gateway.endpoint.rest.port={{ flink_sql_gateway_rest_port }} \
   -Dsql-gateway.endpoint.type={{ flink_sql_gateway_endpoint_type }} \
   -Dsql-gateway.session.check-interval={{ flink_sql_gateway_session_check_interval }} \

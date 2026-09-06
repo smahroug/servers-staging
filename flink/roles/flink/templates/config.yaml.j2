@@ -299,8 +299,12 @@ log.file: {{ flink_log_dir }}/flink.log
 
 # JVM options for monitoring and performance
 {% if flink_jvm_gc_logging %}
-env.java.opts.jobmanager: -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:{{ flink_log_dir }}/jobmanager-gc.log
-env.java.opts.taskmanager: -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:{{ flink_log_dir }}/taskmanager-gc.log
+# Note: flink_jvm_add_opens is required because Flink's JMX server (JmxRegistry,
+# used when jmx.server.port is set) extends sun.rmi.registry.RegistryImpl, which
+# Java 17+ hides behind module access restrictions. Without these flags the
+# JobManager/TaskManager crash with IllegalAccessError on start.
+env.java.opts.jobmanager: -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:{{ flink_log_dir }}/jobmanager-gc.log {{ flink_jvm_add_opens }}
+env.java.opts.taskmanager: -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:{{ flink_log_dir }}/taskmanager-gc.log {{ flink_jvm_add_opens }}
 {% endif %}
 
 {% if flink_jvm_heap_dump_on_oom %}
@@ -315,5 +319,7 @@ env.java.opts.all: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath={{ flink_jvm
 # JMX Metrics Reporter
 metrics.reporters: jmx
 metrics.reporter.jmx.factory.class: org.apache.flink.metrics.jmx.JMXReporterFactory
-metrics.reporter.jmx.port: {{ flink_metrics_jmx_port }}
+# Enables the JMX server (RMI) listener; overrides metrics.reporter.*.port and
+# binds to localhost only. Supports a port, range (e.g. 50100-50200), or list.
+jmx.server.port: {{ flink_metrics_jmx_port }}
 {% endif %}
