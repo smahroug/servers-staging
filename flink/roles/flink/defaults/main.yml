@@ -58,6 +58,11 @@ flink_jvm_heap_dump_path: "{{ flink_log_dir }}"
 # to start when jmx.server.port is set; without it processes crash with
 # IllegalAccessError: "module java.rmi does not export sun.rmi.*"
 flink_jvm_add_opens: "--add-opens=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.server=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport.tcp=ALL-UNNAMED"
+# Address the JMX (RMI) server advertises for remote JMX clients. Without this
+# the JVM advertises the host's hostname, which may resolve to a loopback
+# (e.g. /etc/hosts: 127.0.1.1 flink-server), causing remote clients to get
+# "Connection refused ... advertised a loopback address".
+flink_rmi_hostname: "{{ hostvars[inventory_hostname]['ansible_host'] | default(inventory_hostname) }}"
 
 # Metrics configuration
 flink_metrics_jmx_enabled: true
