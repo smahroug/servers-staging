@@ -31,7 +31,7 @@ flink/
 │       ├── handlers/
 │       │   └── main.yml      # Service handlers
 │       ├── templates/
-│       │   ├── flink-conf.yaml.j2    # Flink configuration template
+│       │   ├── config.yaml.j2           # Flink configuration template
 │       │   └── flink.service.j2      # Systemd service template
 │       ├── vars/
 │       │   └── main.yml      # Environment-specific variables
@@ -327,7 +327,7 @@ sudo ufw status
 {{ flink_home }}/bin/flink list
 
 # Check configuration file
-cat {{ flink_config_dir }}/flink-conf.yaml
+cat {{ flink_config_dir }}/config.yaml
 ```
 
 ### Performance Optimization

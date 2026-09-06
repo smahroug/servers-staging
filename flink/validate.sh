@@ -54,7 +54,7 @@ for dir in "${required_dirs[@]}"; do
 done
 
 # Check required files
-required_files=("roles/flink/tasks/main.yml" "roles/flink/handlers/main.yml" "roles/flink/templates/flink-conf.yaml.j2" "roles/flink/templates/flink.service.j2")
+required_files=("roles/flink/tasks/main.yml" "roles/flink/handlers/main.yml" "roles/flink/templates/config.yaml.j2" "roles/flink/templates/flink.service.j2")
 for file in "${required_files[@]}"; do
     if [ -f "$file" ]; then
         echo "✅ File $file exists"

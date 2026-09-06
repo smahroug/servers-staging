@@ -314,6 +314,6 @@ env.java.opts.all: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath={{ flink_jvm
 {% if flink_metrics_jmx_enabled %}
 # JMX Metrics Reporter
 metrics.reporters: jmx
-metrics.reporter.jmx.factory.class: org.apache.flink.metrics.jmx.JMXReporter
+metrics.reporter.jmx.factory.class: org.apache.flink.metrics.jmx.JMXReporterFactory
 metrics.reporter.jmx.port: {{ flink_metrics_jmx_port }}
 {% endif %}
