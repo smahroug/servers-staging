@@ -317,11 +317,21 @@ env.java.opts.all: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath={{ flink_jvm
 # Metrics
 #==============================================================================
 
+{% set flink_metrics_reporters = [] %}
+{% if flink_metrics_jmx_enabled %}{{ flink_metrics_reporters.append('jmx') }}{% endif %}
+{% if flink_metrics_prometheus_enabled %}{{ flink_metrics_reporters.append('prom') }}{% endif %}
+metrics.reporters: {{ flink_metrics_reporters | join(',') }}
+
 {% if flink_metrics_jmx_enabled %}
 # JMX Metrics Reporter
-metrics.reporters: jmx
 metrics.reporter.jmx.factory.class: org.apache.flink.metrics.jmx.JMXReporterFactory
 # Enables the JMX server (RMI) listener; overrides metrics.reporter.*.port and
 # binds to localhost only. Supports a port, range (e.g. 50100-50200), or list.
 jmx.server.port: {{ flink_metrics_jmx_port }}
+{% endif %}
+
+{% if flink_metrics_prometheus_enabled %}
+# Prometheus Metrics Reporter
+metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+metrics.reporter.prom.port: {{ flink_metrics_prometheus_port }}
 {% endif %}

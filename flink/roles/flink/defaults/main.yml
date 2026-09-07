@@ -67,6 +67,8 @@ flink_rmi_hostname: "{{ hostvars[inventory_hostname]['ansible_host'] | default(i
 # Metrics configuration
 flink_metrics_jmx_enabled: true
 flink_metrics_jmx_port: "8789"
+flink_metrics_prometheus_enabled: true
+flink_metrics_prometheus_port: "9249"
 
 # Log configuration
 flink_log_level: "INFO"
