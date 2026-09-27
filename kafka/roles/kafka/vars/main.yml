@@ -1,0 +1,16 @@
+---
+# Environment-specific variables can be overridden here
+# These variables have higher precedence than defaults
+
+# Example: Production environment might use different heap settings
+# kafka_heap_opts: "-Xms2G -Xmx4G"
+
+# Example: Different Kafka version for testing
+# kafka_version: "3.6.1"
+
+# Example: Run in KRaft mode (no ZooKeeper required)
+# kafka_mode: "kraft"
+# kafka_controller_quorum_voters: "0@192.168.56.3:9093"
+
+# Example: Custom advertised listener for external clients
+# kafka_advertised_host_override: "192.168.56.3"

@@ -1,0 +1,10 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart kafka
+  systemd:
+    name: kafka
+    state: restarted
+  when: not ansible_check_mode and (kafka_start_service | default(true))

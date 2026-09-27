@@ -1,0 +1,287 @@
+---
+- name: Update package cache (non-blocking)
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  retries: 2
+  delay: 10
+  register: update_result
+  until: update_result is succeeded
+  ignore_errors: yes
+
+- name: Install required system packages
+  package:
+    name:
+      - curl
+      - wget
+      - tar
+      - python3
+    state: present
+
+# Java detection and installation (Kafka 3.x requires Java 11+, 21 recommended)
+- name: Check if Java is already installed
+  command: which java
+  register: java_check
+  failed_when: false
+  changed_when: false
+
+- name: Check Java version
+  shell: |
+    java -version 2>&1 | grep -oP 'version "\K[0-9]+' || echo "0"
+  register: java_version_major
+  when: java_check.rc == 0
+  changed_when: false
+
+- name: Set Java facts
+  set_fact:
+    java_version_ok: "{{ java_check.rc == 0 and (java_version_major.stdout | default('0') | int) >= 11 }}"
+
+- name: Detect existing Java installation path
+  shell: |
+    java_bin=$(which java)
+    while [ -L "$java_bin" ]; do
+      java_bin=$(readlink -f "$java_bin")
+    done
+    java_home=$(dirname $(dirname "$java_bin"))
+    echo "$java_home"
+  register: detected_java_home
+  when: java_check.rc == 0
+  changed_when: false
+
+- name: Check for common Java installation paths if no compatible Java found
+  stat:
+    path: "{{ item }}"
+  register: java_path_check
+  loop:
+    - "/usr/lib/jvm/java-21-openjdk-amd64"
+    - "/usr/lib/jvm/java-17-openjdk-amd64"
+    - "/usr/lib/jvm/java-11-openjdk-amd64"
+    - "/usr/lib/jvm/default-java"
+    - "/opt/java"
+    - "/usr/java/latest"
+  when: not java_version_ok
+
+- name: Set detected Java path from common locations
+  set_fact:
+    detected_java_path_from_common: "{{ item.item }}"
+  when: not java_version_ok and item.stat.exists and item.stat.isdir
+  loop: "{{ java_path_check.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Install Java 21 if not already present
+  apt:
+    name: openjdk-21-jdk
+    state: present
+  when: not java_version_ok
+  retries: 5
+  delay: 15
+  register: java_result
+  until: java_result is succeeded
+
+- name: Set default java_home after installation if needed
+  set_fact:
+    post_install_java_home: "/usr/lib/jvm/java-21-openjdk-amd64"
+  when: not java_version_ok
+
+- name: Update java_home variable with detected or default path
+  set_fact:
+    java_home: "{{ detected_java_home.stdout if detected_java_home.stdout is defined and detected_java_home.stdout != '' else (detected_java_path_from_common | default(post_install_java_home | default(java_home))) }}"
+
+- name: Display Java configuration being used
+  debug:
+    msg: "Using Java installation at: {{ java_home }}"
+
+# Kafka user, group and directories
+- name: Create kafka group
+  group:
+    name: "{{ kafka_group }}"
+    state: present
+
+- name: Create kafka user
+  user:
+    name: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    system: yes
+    shell: /bin/bash
+    home: "{{ kafka_home }}"
+    create_home: no
+    state: present
+
+- name: Create kafka directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: '0755'
+  loop:
+    - "{{ kafka_home }}"
+    - "{{ kafka_log_dir }}"
+    - "{{ kafka_data_dir }}"
+    - "{{ kafka_tmp_dir }}"
+
+# Download and install Kafka
+- name: Check if Kafka is already installed
+  stat:
+    path: "{{ kafka_home }}/bin/kafka-server-start.sh"
+  register: kafka_installed
+
+- name: Download Kafka
+  shell: |
+    wget --show-progress --progress=bar:force:noscroll -O "/tmp/{{ kafka_package }}" "{{ kafka_download_url }}"
+  args:
+    creates: "/tmp/{{ kafka_package }}"
+  when: not kafka_installed.stat.exists
+  async: 1200
+  poll: 10
+  register: download_result
+
+- name: Check if downloaded Kafka package exists
+  stat:
+    path: "/tmp/{{ kafka_package }}"
+  register: kafka_package_stat
+  when: not kafka_installed.stat.exists
+
+- name: Extract Kafka
+  unarchive:
+    src: "/tmp/{{ kafka_package }}"
+    dest: "/opt"
+    remote_src: yes
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    creates: "{{ kafka_home }}/bin/kafka-server-start.sh"
+  when: not kafka_installed.stat.exists and (kafka_package_stat.stat.exists | default(false))
+
+- name: Create symlink for Kafka installation
+  file:
+    src: "/opt/kafka_{{ kafka_scala_version }}-{{ kafka_version }}"
+    dest: "{{ kafka_home }}"
+    state: link
+    force: true
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+  when: not kafka_installed.stat.exists and (kafka_package_stat.stat.exists | default(false))
+
+- name: Set ownership of Kafka directory
+  file:
+    path: "{{ kafka_home }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    recurse: yes
+    state: directory
+  when: kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+
+# Configuration
+- name: Generate Kafka server configuration
+  template:
+    src: server.properties.j2
+    dest: "{{ kafka_config_dir }}/server.properties"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: '0644'
+    backup: yes
+  notify:
+    - restart kafka
+  when: kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+
+- name: Generate Kafka log4j configuration
+  template:
+    src: log4j.properties.j2
+    dest: "{{ kafka_config_dir }}/log4j.properties"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: '0644'
+    backup: yes
+  when: kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+
+# KRaft storage initialization
+- name: Check if Kafka storage is already formatted (KRaft)
+  stat:
+    path: "{{ kafka_data_dir }}/meta.properties"
+  register: kafka_meta_properties
+  when: kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+
+- name: Generate Kafka cluster ID
+  command: "{{ kafka_home }}/bin/kafka-storage.sh random-uuid"
+  register: kafka_cluster_id_gen
+  changed_when: false
+  when:
+    - kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+    - kafka_cluster_id | length == 0
+    - not kafka_meta_properties.stat.exists
+
+- name: Set effective Kafka cluster ID
+  set_fact:
+    kafka_cluster_id_effective: "{{ kafka_cluster_id if (kafka_cluster_id | length > 0) else (kafka_cluster_id_gen.stdout | default('')) }}"
+
+- name: Format Kafka storage for KRaft mode
+  command: >
+    {{ kafka_home }}/bin/kafka-storage.sh format
+    --ignore-formatted
+    -t {{ kafka_cluster_id_effective }}
+    -c {{ kafka_config_dir }}/server.properties
+  become_user: "{{ kafka_user }}"
+  when:
+    - kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+    - not kafka_meta_properties.stat.exists
+
+- name: Create Kafka systemd service file
+  template:
+    src: kafka.service.j2
+    dest: /etc/systemd/system/kafka.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart kafka
+
+- name: Configure log rotation for Kafka logs
+  copy:
+    content: |
+      {{ kafka_log_dir }}/*.log {
+          daily
+          missingok
+          rotate {{ kafka_log_max_files }}
+          compress
+          notifempty
+          create 644 {{ kafka_user }} {{ kafka_group }}
+          size {{ kafka_log_max_size }}
+          copytruncate
+      }
+    dest: /etc/logrotate.d/kafka
+    mode: '0644'
+  when: kafka_log_max_files is defined and kafka_log_max_size is defined
+
+- name: Clean up downloaded package
+  file:
+    path: "/tmp/{{ kafka_package }}"
+    state: absent
+
+- name: Start and enable Kafka service
+  systemd:
+    name: kafka
+    state: "{{ 'started' if kafka_start_service else 'stopped' }}"
+    enabled: "{{ kafka_enable_service }}"
+    daemon_reload: yes
+  when: kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+
+- name: Wait for Kafka listener port to be available
+  wait_for:
+    port: "{{ kafka_port }}"
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 10
+    timeout: 120
+  when: kafka_start_service and (kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false)))
+
+- name: Verify Kafka installation
+  command: "{{ kafka_home }}/bin/kafka-topics.sh --version"
+  register: kafka_version_check
+  changed_when: false
+  failed_when: kafka_version_check.rc != 0
+  when: kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))
+
+- name: Display Kafka version information
+  debug:
+    msg: "Kafka installation verified: {{ kafka_version_check.stdout_lines[0] if kafka_version_check.stdout_lines else 'Version check failed' }}"
+  when: kafka_installed.stat.exists or (kafka_package_stat.stat.exists | default(false))

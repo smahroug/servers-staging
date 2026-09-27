@@ -1,0 +1,31 @@
+# Production Environment Example Variables
+# Copy this file to roles/kafka/vars/main.yml and customize for your environment
+
+---
+# Production Kafka configuration with higher resource allocations
+
+# Production heap settings for larger workloads
+kafka_heap_opts: "-Xms2G -Xmx4G"
+
+# More threads for higher throughput
+kafka_num_network_threads: 8
+kafka_num_io_threads: 16
+kafka_socket_request_max_bytes: 104857600
+
+# Production retention (7 days)
+kafka_log_retention_hours: 168
+kafka_log_segment_bytes: 1073741824
+
+# Disable auto-creation of topics in production (topics should be managed explicitly)
+kafka_auto_create_topics_enable: false
+
+# Advertised host must be reachable by external clients
+kafka_advertised_host_override: "192.168.56.3"
+
+# Service configuration
+kafka_start_service: true
+kafka_enable_service: true
+
+# JMX metrics
+kafka_jmx_enabled: true
+kafka_jmx_port: 9999

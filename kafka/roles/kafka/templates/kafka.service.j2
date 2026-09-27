@@ -1,0 +1,45 @@
+[Unit]
+Description=Apache Kafka (KRaft)
+Documentation=https://kafka.apache.org/documentation/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ kafka_user }}
+Group={{ kafka_group }}
+Environment="JAVA_HOME={{ java_home }}"
+Environment="KAFKA_HOME={{ kafka_home }}"
+Environment="KAFKA_HEAP_OPTS={{ kafka_heap_opts }}"
+Environment="LOG_DIR={{ kafka_log_dir }}"
+{% if kafka_jmx_enabled %}
+Environment="JMX_PORT={{ kafka_jmx_port }}"
+{% endif %}
+ExecStart={{ kafka_home }}/bin/kafka-server-start.sh {{ kafka_config_dir }}/server.properties
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths={{ kafka_home }} {{ kafka_log_dir }} {{ kafka_data_dir }} {{ kafka_tmp_dir }} /tmp
+
+# Process management
+KillMode=mixed
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Enhanced restart behavior
+StartLimitInterval=300
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

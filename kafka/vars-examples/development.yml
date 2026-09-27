@@ -1,0 +1,28 @@
+# Development Environment Example Variables
+# Copy this file to roles/kafka/vars/main.yml and customize for your environment
+
+---
+# Development Kafka configuration with minimal resource usage
+
+# Use current stable version
+kafka_version: "3.7.0"
+
+# Development heap settings for smaller workloads
+kafka_heap_opts: "-Xms256m -Xmx512m"
+
+# Single broker, single partition, replication factor 1
+kafka_broker_id: 0
+kafka_node_id: 0
+kafka_num_partitions: 1
+kafka_default_replication_factor: 1
+kafka_offsets_topic_replication_factor: 1
+
+# Shorter retention for development
+kafka_log_retention_hours: 24
+
+# Auto-create topics for convenience
+kafka_auto_create_topics_enable: true
+
+# Service configuration
+kafka_start_service: true
+kafka_enable_service: true

@@ -1,0 +1,90 @@
+---
+- name: Uninstall Apache Kafka
+  hosts: kafka_servers
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Stop Kafka service
+      systemd:
+        name: kafka
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable Kafka service
+      systemd:
+        name: kafka
+        enabled: no
+      ignore_errors: yes
+
+    - name: Remove Kafka systemd service file
+      file:
+        path: /etc/systemd/system/kafka.service
+        state: absent
+
+    - name: Remove Kafka log rotation configuration
+      file:
+        path: /etc/logrotate.d/kafka
+        state: absent
+      ignore_errors: yes
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Remove Kafka symlink
+      file:
+        path: "{{ kafka_home | default('/opt/kafka') }}"
+        state: absent
+
+    - name: Remove Kafka installation directory
+      file:
+        path: "/opt/kafka_{{ kafka_scala_version | default('2.13') }}-{{ kafka_version | default('3.7.0') }}"
+        state: absent
+
+    - name: Remove Kafka data directory (KRaft metadata + topic data)
+      file:
+        path: "{{ kafka_data_dir | default('/var/lib/kafka') }}"
+        state: absent
+
+    - name: Remove Kafka log directory
+      file:
+        path: "{{ kafka_log_dir | default('/var/log/kafka') }}"
+        state: absent
+
+    - name: Remove Kafka temp directory
+      file:
+        path: "{{ kafka_tmp_dir | default('/tmp/kafka') }}"
+        state: absent
+
+    - name: Remove downloaded Kafka package
+      file:
+        path: "/tmp/{{ kafka_package | default('kafka_2.13-3.7.0.tgz') }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove kafka user
+      user:
+        name: "{{ kafka_user | default('kafka') }}"
+        state: absent
+        remove: yes
+      ignore_errors: yes
+
+    - name: Remove kafka group
+      group:
+        name: "{{ kafka_group | default('kafka') }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Display uninstallation summary
+      debug:
+        msg: |
+          Kafka has been successfully uninstalled.
+          Removed:
+          - Kafka service
+          - /opt/kafka and /opt/kafka_{{ kafka_scala_version | default('2.13') }}-{{ kafka_version | default('3.7.0') }}
+          - {{ kafka_data_dir | default('/var/lib/kafka') }} (KRaft metadata + topic data)
+          - {{ kafka_log_dir | default('/var/log/kafka') }}
+          - {{ kafka_tmp_dir | default('/tmp/kafka') }}
+          - Log rotation configuration
+          - kafka user and group

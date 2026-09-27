@@ -1,0 +1,40 @@
+# Secure Inventory Configuration Template
+# Copy this file to inventory/hosts.yml and customize for your environment
+
+all:
+  children:
+    kafka_servers:
+      hosts:
+        kafka-broker-1:
+          ansible_host: 10.0.1.20  # Replace with your broker server IP
+          kafka_role: broker
+          # Optional: override the advertised hostname/IP used by Kafka clients
+          # (by default it is auto-detected from the host's default IPv4 address)
+          # kafka_advertised_host_override: 10.0.1.20
+      vars:
+        # Security: Use SSH key authentication (recommended)
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: ~/.ssh/id_rsa
+
+        # Alternative: Use Ansible Vault for password authentication
+        # ansible_user: user
+        # ansible_password: "{{ vault_ansible_password }}"
+
+        # Privilege escalation
+        ansible_become: true
+        ansible_become_method: sudo
+
+        # Alternative: Use Ansible Vault for sudo password
+        # ansible_become_password: "{{ vault_ansible_become_password }}"
+
+        # SSH connection optimization
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+        # Connection settings
+        ansible_connection: ssh
+        ansible_python_interpreter: /usr/bin/python3
+
+        # Optional: Custom variables per environment
+        # kafka_port: 9092
+        # kafka_num_partitions: 3
+        # kafka_log_retention_hours: 168
