@@ -151,6 +151,105 @@
     state: directory
   when: flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))
 
+# --- Kafka connector and Confluent Schema Registry jars ---
+# Jars installed into {{ flink_home }}/lib so they are loaded by JobManager,
+# TaskManagers and the SQL Gateway at startup.
+- name: Build list of Kafka / Confluent jars to download
+  set_fact:
+    flink_kafka_jars:
+      # Kafka connector (thin jar) matching Flink 2.x
+      - url: "{{ flink_maven_repo_url }}/org/apache/flink/flink-connector-kafka/{{ flink_kafka_connector_version }}/flink-connector-kafka-{{ flink_kafka_connector_version }}.jar"
+        name: "flink-connector-kafka-{{ flink_kafka_connector_version }}.jar"
+      # Kafka clients required by the thin connector jar
+      - url: "{{ flink_maven_repo_url }}/org/apache/kafka/kafka-clients/4.2.0/kafka-clients-4.2.0.jar"
+        name: "kafka-clients-4.2.0.jar"
+      # Flink Avro format for Confluent Schema Registry (format: confluent-registry-avro)
+      - url: "{{ flink_maven_repo_url }}/org/apache/flink/flink-avro-confluent-registry/{{ flink_version }}/flink-avro-confluent-registry-{{ flink_version }}.jar"
+        name: "flink-avro-confluent-registry-{{ flink_version }}.jar"
+      # Flink JSON format (base for confluent-registry-json and plain JSON)
+      - url: "{{ flink_maven_repo_url }}/org/apache/flink/flink-json/{{ flink_version }}/flink-json-{{ flink_version }}.jar"
+        name: "flink-json-{{ flink_version }}.jar"
+      # Avro runtime (required by confluent registry serializer)
+      - url: "{{ flink_maven_repo_url }}/org/apache/avro/avro/1.12.0/avro-1.12.0.jar"
+        name: "avro-1.12.0.jar"
+  when: flink_kafka_connector_enabled
+
+- name: Add Confluent Schema Registry jars to the download list
+  set_fact:
+    flink_kafka_jars: "{{ flink_kafka_jars | default([]) + [
+      {'url': flink_confluent_maven_repo_url ~ '/io/confluent/kafka-avro-serializer/' ~ flink_confluent_version ~ '/kafka-avro-serializer-' ~ flink_confluent_version ~ '.jar', 'name': 'kafka-avro-serializer-' ~ flink_confluent_version ~ '.jar'},
+      {'url': flink_confluent_maven_repo_url ~ '/io/confluent/kafka-json-schema-serializer/' ~ flink_confluent_version ~ '/kafka-json-schema-serializer-' ~ flink_confluent_version ~ '.jar', 'name': 'kafka-json-schema-serializer-' ~ flink_confluent_version ~ '.jar'},
+      {'url': flink_confluent_maven_repo_url ~ '/io/confluent/kafka-schema-registry-client/' ~ flink_confluent_version ~ '/kafka-schema-registry-client-' ~ flink_confluent_version ~ '.jar', 'name': 'kafka-schema-registry-client-' ~ flink_confluent_version ~ '.jar'},
+      {'url': flink_confluent_maven_repo_url ~ '/io/confluent/kafka-schema-serializer/' ~ flink_confluent_version ~ '/kafka-schema-serializer-' ~ flink_confluent_version ~ '.jar', 'name': 'kafka-schema-serializer-' ~ flink_confluent_version ~ '.jar'},
+      {'url': flink_confluent_maven_repo_url ~ '/io/confluent/common-config/' ~ flink_confluent_version ~ '/common-config-' ~ flink_confluent_version ~ '.jar', 'name': 'common-config-' ~ flink_confluent_version ~ '.jar'},
+      {'url': flink_confluent_maven_repo_url ~ '/io/confluent/common-utils/' ~ flink_confluent_version ~ '/common-utils-' ~ flink_confluent_version ~ '.jar', 'name': 'common-utils-' ~ flink_confluent_version ~ '.jar'}
+    ] }}"
+  when: flink_kafka_connector_enabled and flink_confluent_schema_registry_enabled
+
+- name: Create local cache directory for jars on the Ansible controller
+  file:
+    path: "{{ playbook_dir }}/.jars/flink"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: flink_kafka_connector_enabled
+
+- name: Download Kafka / Confluent jars on the Ansible controller
+  get_url:
+    url: "{{ item.url }}"
+    dest: "{{ playbook_dir }}/.jars/flink/{{ item.name }}"
+    mode: '0644'
+  loop: "{{ flink_kafka_jars | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: flink_kafka_connector_enabled
+  register: jar_download
+  until: jar_download is succeeded
+  retries: 3
+  delay: 5
+
+- name: Copy Kafka / Confluent jars from controller into Flink lib directory
+  copy:
+    src: "{{ playbook_dir }}/.jars/flink/{{ item.name }}"
+    dest: "{{ flink_home }}/lib/{{ item.name }}"
+    owner: "{{ flink_user }}"
+    group: "{{ flink_group }}"
+    mode: '0644'
+  loop: "{{ flink_kafka_jars | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: flink_kafka_connector_enabled and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
+  notify:
+    - restart flink-jobmanager
+    - restart flink-taskmanager
+
+- name: Verify Kafka connector jar is in Flink lib directory
+  stat:
+    path: "{{ flink_home }}/lib/flink-connector-kafka-{{ flink_kafka_connector_version }}.jar"
+  register: flink_kafka_connector_jar
+  when: flink_kafka_connector_enabled and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
+
+- name: Fail if Kafka connector jar is missing
+  fail:
+    msg: "Kafka connector jar not found in {{ flink_home }}/lib after download"
+  when: flink_kafka_connector_enabled and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false))) and not flink_kafka_connector_jar.stat.exists
+
+- name: Display installed Kafka jars
+  command: "ls -1 {{ flink_home }}/lib"
+  register: flink_lib_listing
+  changed_when: false
+  when: flink_kafka_connector_enabled and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
+
+- name: Show Flink lib directory contents
+  debug:
+    msg: "Jars in {{ flink_home }}/lib: {{ flink_lib_listing.stdout_lines | default([]) }}"
+  when: flink_kafka_connector_enabled and (flink_installed.stat.exists or (flink_package_stat.stat.exists | default(false)))
+
 - name: Generate Flink configuration
   template:
     src: config.yaml.j2
