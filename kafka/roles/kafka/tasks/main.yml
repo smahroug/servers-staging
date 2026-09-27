@@ -1,14 +1,4 @@
 ---
-- name: Update package cache (non-blocking)
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
-  when: ansible_os_family == "Debian"
-  retries: 2
-  delay: 10
-  register: update_result
-  until: update_result is succeeded
-  ignore_errors: yes
 
 - name: Install required system packages
   package:
