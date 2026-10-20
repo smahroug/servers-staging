@@ -1,0 +1,235 @@
+---
+
+- name: Check if Java is already installed
+  command: which java
+  register: java_check
+  failed_when: false
+  changed_when: false
+
+- name: Check Java version
+  shell: |
+    java -version 2>&1 | grep -oP 'version "\K[0-9]+' || echo "0"
+  register: java_version_major
+  when: java_check.rc == 0
+  changed_when: false
+
+- name: Set Java facts
+  set_fact:
+    java_installed: "{{ java_check.rc == 0 and (java_version_major.stdout | int) >= 21 }}"
+    java_version_ok: "{{ java_check.rc == 0 and (java_version_major.stdout | int) >= 21 }}"
+
+- name: Detect existing Java 21+ installation path
+  shell: |
+    java_bin=$(which java)
+    while [ -L "$java_bin" ]; do
+      java_bin=$(readlink -f "$java_bin")
+    done
+    java_home=$(dirname $(dirname "$java_bin"))
+    echo "$java_home"
+  register: detected_java_home
+  when: java_version_ok
+  changed_when: false
+
+- name: Check for common Java 21 installation paths if no compatible Java found
+  stat:
+    path: "{{ item }}"
+  register: java_path_check
+  loop:
+    - "/usr/lib/jvm/java-21-openjdk-arm64"
+    - "/usr/lib/jvm/java-21-openjdk-amd64"
+    - "/usr/lib/jvm/java-17-openjdk-arm64"
+    - "/usr/lib/jvm/java-17-openjdk-amd64"
+    - "/usr/lib/jvm/default-java"
+    - "/opt/java"
+    - "/usr/java/latest"
+  when: not java_version_ok
+
+- name: Set detected Java path from common locations
+  set_fact:
+    detected_java_path_from_common: "{{ item.item }}"
+  when: not java_version_ok and item.stat.exists and item.stat.isdir
+  loop: "{{ java_path_check.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Install Java 21 if not already present
+  apt:
+    name: openjdk-21-jdk
+    state: present
+  when: not java_version_ok
+  retries: 5
+  delay: 15
+  register: java_result
+  until: java_result is succeeded
+
+- name: Set default java_home after installation if needed
+  set_fact:
+    post_install_java_home: "/usr/lib/jvm/java-21-openjdk-{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+  when: not java_version_ok
+
+- name: Update java_home variable with detected or default path
+  set_fact:
+    java_home: "{{ detected_java_home.stdout if detected_java_home.stdout is defined and detected_java_home.stdout != '' else (detected_java_path_from_common | default(post_install_java_home | default(java_home))) }}"
+
+- name: Display Java configuration being used
+  debug:
+    msg: "Using Java installation at: {{ java_home }}"
+
+- name: Create polaris group
+  group:
+    name: "{{ polaris_group }}"
+    state: present
+
+- name: Create polaris user
+  user:
+    name: "{{ polaris_user }}"
+    group: "{{ polaris_group }}"
+    system: yes
+    shell: /bin/bash
+    home: "{{ polaris_home }}"
+    create_home: no
+    state: present
+
+- name: Create polaris directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ polaris_user }}"
+    group: "{{ polaris_group }}"
+    mode: '0755'
+  loop:
+    - "{{ polaris_home }}"
+    - "{{ polaris_log_dir }}"
+    - "{{ polaris_data_dir }}"
+    - "{{ polaris_tmp_dir }}"
+
+- name: Check if Polaris is already installed
+  stat:
+    path: "{{ polaris_home }}/bin/server"
+  register: polaris_installed
+
+- name: Download Polaris on the target host
+  get_url:
+    url: "{{ polaris_download_url }}"
+    dest: "/tmp/{{ polaris_package }}"
+    mode: '0644'
+    timeout: 600
+  when: not polaris_installed.stat.exists
+  register: download_result
+  until: download_result is succeeded
+  retries: 3
+  delay: 10
+
+- name: Check if downloaded Polaris package exists
+  stat:
+    path: "/tmp/{{ polaris_package }}"
+  register: polaris_package_stat
+  when: not polaris_installed.stat.exists
+
+- name: Extract Polaris
+  unarchive:
+    src: "/tmp/{{ polaris_package }}"
+    dest: "/opt"
+    remote_src: yes
+    owner: "{{ polaris_user }}"
+    group: "{{ polaris_group }}"
+    creates: "/opt/{{ polaris_extracted_dir }}/bin/server"
+  when: not polaris_installed.stat.exists and (polaris_package_stat.stat.exists | default(false))
+
+- name: Create symlink for Polaris installation
+  file:
+    src: "/opt/{{ polaris_extracted_dir }}"
+    dest: "{{ polaris_home }}"
+    state: link
+    force: true
+    owner: "{{ polaris_user }}"
+    group: "{{ polaris_group }}"
+  when: not polaris_installed.stat.exists and (polaris_package_stat.stat.exists | default(false))
+
+- name: Set ownership of Polaris directory
+  file:
+    path: "{{ polaris_home }}"
+    owner: "{{ polaris_user }}"
+    group: "{{ polaris_group }}"
+    recurse: yes
+    state: directory
+  when: polaris_installed.stat.exists or (polaris_package_stat.stat.exists | default(false))
+
+- name: Create Polaris config directory
+  file:
+    path: "{{ polaris_config_dir }}"
+    state: directory
+    owner: "{{ polaris_user }}"
+    group: "{{ polaris_group }}"
+    mode: '0755'
+
+- name: Generate Polaris configuration
+  template:
+    src: application.properties.j2
+    dest: "{{ polaris_config_dir }}/application.properties"
+    owner: "{{ polaris_user }}"
+    group: "{{ polaris_group }}"
+    mode: '0644'
+    backup: yes
+  notify:
+    - restart polaris
+  when: polaris_installed.stat.exists or (polaris_package_stat.stat.exists | default(false))
+
+- name: Create Polaris systemd service file
+  template:
+    src: polaris.service.j2
+    dest: /etc/systemd/system/polaris.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart polaris
+
+- name: Configure log rotation for Polaris logs
+  copy:
+    content: |
+      {{ polaris_log_dir }}/*.log {
+          daily
+          missingok
+          rotate {{ polaris_log_max_files }}
+          compress
+          notifempty
+          create 644 {{ polaris_user }} {{ polaris_group }}
+          size {{ polaris_log_max_size }}
+          copytruncate
+      }
+    dest: /etc/logrotate.d/polaris
+    mode: '0644'
+  when: polaris_log_max_files is defined and polaris_log_max_size is defined
+
+- name: Clean up downloaded package
+  file:
+    path: "/tmp/{{ polaris_package }}"
+    state: absent
+
+- name: Start and enable Polaris service
+  systemd:
+    name: polaris
+    state: "{{ 'started' if polaris_start_service else 'stopped' }}"
+    enabled: "{{ polaris_enable_service }}"
+    daemon_reload: yes
+  when: polaris_installed.stat.exists or (polaris_package_stat.stat.exists | default(false))
+
+- name: Wait for Polaris service to be available
+  wait_for:
+    port: "{{ polaris_http_port }}"
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 10
+    timeout: 180
+  when: polaris_start_service and (polaris_installed.stat.exists or (polaris_package_stat.stat.exists | default(false)))
+
+- name: Verify Polaris installation
+  command: "{{ polaris_home }}/bin/server --help"
+  register: polaris_version_check
+  changed_when: false
+  failed_when: false
+  when: polaris_installed.stat.exists or (polaris_package_stat.stat.exists | default(false))
+
+- name: Display Polaris version information
+  debug:
+    msg: "Polaris installation verified: {{ polaris_version_check.stdout_lines[0] if polaris_version_check.stdout_lines is defined and polaris_version_check.stdout_lines else 'Version check skipped' }}"
+  when: polaris_installed.stat.exists or (polaris_package_stat.stat.exists | default(false))

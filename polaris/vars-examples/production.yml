@@ -1,0 +1,21 @@
+---
+# Production environment configuration for Apache Polaris
+# Optimized for production workloads
+
+# Polaris version
+polaris_version: "1.2.0"
+
+# EclipseLink persistence for production (database-backed)
+polaris_persistence_type: "eclipselink"
+polaris_eclipse_link_persistence_unit: "polaris"
+
+# Higher resource allocation
+polaris_jvm_heap_size: "2048m"
+
+# Standard logging
+polaris_log_level: "INFO"
+
+# Service configuration
+polaris_start_service: true
+polaris_enable_service: true
+

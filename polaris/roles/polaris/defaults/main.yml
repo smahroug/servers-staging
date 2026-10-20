@@ -1,0 +1,40 @@
+---
+# Apache Polaris version and download settings
+polaris_version: "1.8.0"
+polaris_package: "polaris-bin-{{ polaris_version }}.tgz"
+polaris_download_url: "https://downloads.apache.org/polaris/{{ polaris_version }}/{{ polaris_package }}"
+polaris_extracted_dir: "polaris-bin-{{ polaris_version }}"
+
+# Installation directories
+polaris_user: "polaris"
+polaris_group: "polaris"
+polaris_home: "/opt/polaris"
+polaris_config_dir: "{{ polaris_home }}/conf"
+polaris_log_dir: "/var/log/polaris"
+polaris_data_dir: "/var/lib/polaris"
+polaris_tmp_dir: "/tmp/polaris"
+
+# Java settings
+java_home: "/usr/lib/jvm/java-21-openjdk-arm64"
+
+# Polaris server configuration (Quarkus-based since 1.8.0)
+polaris_host: "0.0.0.0"
+polaris_http_port: 8181
+polaris_metrics_port: 8182
+polaris_graceful_shutdown_timeout: "60 seconds"
+
+# Persistence configuration (InMemory for dev; relational/eclipselink for prod)
+polaris_persistence_type: "in-memory"
+
+# Service configuration
+polaris_start_service: true
+polaris_enable_service: true
+
+# Log configuration
+polaris_log_level: "INFO"
+polaris_log_max_files: 10
+polaris_log_max_size: "100MB"
+
+# JVM options
+polaris_jvm_heap_size: "1024m"
+polaris_jvm_extra_opts: ""

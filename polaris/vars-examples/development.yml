@@ -1,0 +1,20 @@
+---
+# Development environment configuration for Apache Polaris
+# Optimized for local development and testing
+
+# Polaris version
+polaris_version: "1.2.0"
+
+# In-memory persistence for development (data lost on restart)
+polaris_persistence_type: "in-memory"
+
+# Lower resource usage
+polaris_jvm_heap_size: "512m"
+
+# Verbose logging for debugging
+polaris_log_level: "DEBUG"
+
+# Service configuration
+polaris_start_service: true
+polaris_enable_service: true
+

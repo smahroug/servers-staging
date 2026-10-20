@@ -1,0 +1,13 @@
+---
+# Environment-specific variables can be overridden here
+# These variables have higher precedence than defaults
+
+# Example: Production environment might use different memory settings
+# polaris_jvm_heap_size: "2048m"
+
+# Example: Different Polaris version for testing
+# polaris_version: "1.1.0"
+
+# Example: Use EclipseLink persistence for production
+# polaris_persistence_type: "eclipselink"
+

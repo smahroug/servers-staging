@@ -1,0 +1,45 @@
+[Unit]
+Description=Apache Polaris
+Documentation=https://polaris.apache.org/
+After=network.target
+
+[Service]
+Type=simple
+User={{ polaris_user }}
+Group={{ polaris_group }}
+Environment=JAVA_HOME={{ java_home }}
+Environment=POLARIS_HOME={{ polaris_home }}
+Environment=POLARIS_JAVA_OPTS=-Xmx{{ polaris_jvm_heap_size }} {{ polaris_jvm_extra_opts }} -Dquarkus.config.locations=file:{{ polaris_config_dir }}/application.properties
+Environment=QUARKUS_LOG_FILE_PATH={{ polaris_log_dir }}
+WorkingDirectory={{ polaris_home }}
+ExecStart={{ polaris_home }}/bin/server
+ExecStop=/bin/kill -15 $MAINPID
+SuccessExitStatus=143
+
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths={{ polaris_home }} {{ polaris_log_dir }} {{ polaris_data_dir }} {{ polaris_tmp_dir }} /tmp
+
+# Process management
+KillMode=mixed
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Enhanced restart behavior
+StartLimitInterval=300
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

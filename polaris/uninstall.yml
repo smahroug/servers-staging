@@ -1,0 +1,90 @@
+---
+- name: Uninstall Apache Polaris
+  hosts: polaris_servers
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Stop Polaris service
+      systemd:
+        name: polaris
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable Polaris service
+      systemd:
+        name: polaris
+        enabled: no
+      ignore_errors: yes
+
+    - name: Remove Polaris systemd service file
+      file:
+        path: /etc/systemd/system/polaris.service
+        state: absent
+
+    - name: Remove Polaris log rotation configuration
+      file:
+        path: /etc/logrotate.d/polaris
+        state: absent
+      ignore_errors: yes
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Remove Polaris symlink
+      file:
+        path: "{{ polaris_home | default('/opt/polaris') }}"
+        state: absent
+
+    - name: Remove Polaris installation directory
+      file:
+        path: "/opt/{{ polaris_extracted_dir | default('polaris-bin-' ~ (polaris_version | default('1.8.0'))) }}"
+        state: absent
+
+    - name: Remove Polaris data directory
+      file:
+        path: "{{ polaris_data_dir | default('/var/lib/polaris') }}"
+        state: absent
+
+    - name: Remove Polaris log directory
+      file:
+        path: "{{ polaris_log_dir | default('/var/log/polaris') }}"
+        state: absent
+
+    - name: Remove Polaris temp directory
+      file:
+        path: "{{ polaris_tmp_dir | default('/tmp/polaris') }}"
+        state: absent
+
+    - name: Remove downloaded Polaris package
+      file:
+        path: "/tmp/{{ polaris_package | default('polaris-bin-1.8.0.tgz') }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove polaris user
+      user:
+        name: "{{ polaris_user | default('polaris') }}"
+        state: absent
+        remove: yes
+      ignore_errors: yes
+
+    - name: Remove polaris group
+      group:
+        name: "{{ polaris_group | default('polaris') }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Display uninstallation summary
+      debug:
+        msg: |
+          Apache Polaris has been successfully uninstalled.
+          Removed:
+          - Polaris service
+          - /opt/polaris and /opt/{{ polaris_extracted_dir | default('polaris-bin-' ~ (polaris_version | default('1.8.0'))) }}
+          - {{ polaris_data_dir | default('/var/lib/polaris') }}
+          - {{ polaris_log_dir | default('/var/log/polaris') }}
+          - {{ polaris_tmp_dir | default('/tmp/polaris') }}
+          - Log rotation configuration
+          - polaris user and group

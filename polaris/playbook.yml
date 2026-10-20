@@ -1,0 +1,13 @@
+---
+- name: Deploy Apache Polaris
+  hosts: polaris_servers
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - polaris
+
+  tags:
+    - polaris
+    - deployment
+
