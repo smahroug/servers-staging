@@ -21,7 +21,15 @@ java_home: "/usr/lib/jvm/java-21-openjdk-arm64"
 polaris_host: "0.0.0.0"
 polaris_http_port: 8181
 polaris_metrics_port: 8182
-polaris_graceful_shutdown_timeout: "60 seconds"
+polaris_graceful_shutdown_timeout: "PT60S"
+
+# CORS configuration (required by Polaris Console)
+polaris_cors_enabled: true
+polaris_cors_origins: "http://192.168.56.4:8080,http://localhost:8080,http://localhost:5173"
+
+# Bootstrap root principal credentials (format: realm,client_id,client_secret[;realm2,client2,secret2])
+# Fixed credentials so they survive server restarts
+polaris_bootstrap_credentials: "POLARIS,root,root"
 
 # Persistence configuration (InMemory for dev; relational/eclipselink for prod)
 polaris_persistence_type: "in-memory"

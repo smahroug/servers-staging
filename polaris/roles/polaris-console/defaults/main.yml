@@ -1,0 +1,28 @@
+---
+# Polaris Console version and source settings
+console_repo_url: "https://github.com/apache/polaris-tools.git"
+console_repo_version: "main"
+console_source_dir: "/opt/polaris-tools"
+console_build_dir: "{{ console_source_dir }}/console"
+
+# Node.js settings
+nodejs_major_version: "20"
+
+# Console build configuration (Vite env vars, baked at build time)
+console_polaris_api_url: "http://192.168.56.4:8181"
+console_polaris_realm: "POLARIS"
+console_polaris_principal_scope: "PRINCIPAL_ROLE:ALL"
+console_realm_header_name: "Polaris-Realm"
+console_oauth_token_url: "{{ console_polaris_api_url }}/api/catalog/v1/oauth/tokens"
+
+# Web server settings
+console_web_user: "www-data"
+console_web_group: "www-data"
+console_web_root: "/var/www/polaris-console"
+console_http_port: 8080
+console_server_name: "192.168.56.4"
+
+# Service configuration
+console_start_service: true
+console_enable_service: true
+

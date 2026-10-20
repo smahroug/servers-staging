@@ -1,0 +1,14 @@
+---
+- name: Deploy Apache Polaris Console
+  hosts: polaris_servers
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - polaris-console
+
+  tags:
+    - polaris-console
+    - console
+    - deployment
+

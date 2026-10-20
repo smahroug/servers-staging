@@ -9,7 +9,7 @@ User={{ polaris_user }}
 Group={{ polaris_group }}
 Environment=JAVA_HOME={{ java_home }}
 Environment=POLARIS_HOME={{ polaris_home }}
-Environment=POLARIS_JAVA_OPTS=-Xmx{{ polaris_jvm_heap_size }} {{ polaris_jvm_extra_opts }} -Dquarkus.config.locations=file:{{ polaris_config_dir }}/application.properties
+Environment="POLARIS_JAVA_OPTS=-Xmx{{ polaris_jvm_heap_size }} {{ polaris_jvm_extra_opts }} -Dquarkus.config.locations=file:{{ polaris_config_dir }}/application.properties -Dpolaris.bootstrap.credentials={{ polaris_bootstrap_credentials }}"
 Environment=QUARKUS_LOG_FILE_PATH={{ polaris_log_dir }}
 WorkingDirectory={{ polaris_home }}
 ExecStart={{ polaris_home }}/bin/server

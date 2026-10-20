@@ -1,0 +1,182 @@
+---
+# 1. Node.js
+- name: Install Node.js
+  ansible.builtin.include_tasks: nodejs.yml
+
+# 2. Build tools
+- name: Install build prerequisites (git, make, nginx)
+  apt:
+    name:
+      - git
+      - make
+      - nginx
+    state: present
+    update_cache: yes
+
+# 3. Source code
+- name: Check if polaris-tools repository already exists
+  stat:
+    path: "{{ console_build_dir }}/package.json"
+  register: repo_check
+
+- name: Clone polaris-tools repository
+  git:
+    repo: "{{ console_repo_url }}"
+    dest: "{{ console_source_dir }}"
+    version: "{{ console_repo_version }}"
+    depth: 1
+  when: not repo_check.stat.exists
+
+- name: Update polaris-tools repository
+  git:
+    repo: "{{ console_repo_url }}"
+    dest: "{{ console_source_dir }}"
+    version: "{{ console_repo_version }}"
+    update: yes
+  when: repo_check.stat.exists
+  register: repo_update
+
+# 4. Console configuration (.env for Vite build)
+- name: Generate console .env file
+  copy:
+    content: |
+      VITE_POLARIS_API_URL={{ console_polaris_api_url }}
+      VITE_POLARIS_REALM={{ console_polaris_realm }}
+      VITE_POLARIS_PRINCIPAL_SCOPE={{ console_polaris_principal_scope }}
+      VITE_POLARIS_REALM_HEADER_NAME={{ console_realm_header_name }}
+      VITE_OAUTH_TOKEN_URL={{ console_oauth_token_url }}
+    dest: "{{ console_build_dir }}/.env"
+    mode: '0644'
+  register: console_env
+
+# 5. Build
+- name: Install console dependencies (npm install)
+  community.general.npm:
+    path: "{{ console_build_dir }}"
+    state: present
+  register: npm_install
+  until: npm_install is succeeded
+  retries: 3
+  delay: 10
+  async: 1800
+  poll: 30
+
+- name: Check if console build output already exists
+  stat:
+    path: "{{ console_build_dir }}/dist/index.html"
+  register: dist_precheck
+
+- name: Build console (npm run build)
+  command: npm run build
+  args:
+    chdir: "{{ console_build_dir }}"
+  when: npm_install is changed or console_env is changed or repo_update is changed or not repo_check.stat.exists or not dist_precheck.stat.exists
+  register: npm_build
+  async: 1800
+  poll: 30
+
+- name: Check if console build output exists
+  stat:
+    path: "{{ console_build_dir }}/dist/index.html"
+  register: dist_check
+
+- name: Fail if console build output is missing
+  fail:
+    msg: "Console build failed: {{ console_build_dir }}/dist/index.html not found"
+  when: not dist_check.stat.exists
+
+# 6. Deploy static files
+- name: Create web root directory
+  file:
+    path: "{{ console_web_root }}"
+    state: directory
+    owner: "{{ console_web_user }}"
+    group: "{{ console_web_group }}"
+    mode: '0755'
+
+- name: Deploy console build to web root
+  copy:
+    src: "{{ console_build_dir }}/dist/"
+    dest: "{{ console_web_root }}/"
+    owner: "{{ console_web_user }}"
+    group: "{{ console_web_group }}"
+    remote_src: yes
+  notify: reload nginx
+
+- name: Fix permissions (directories 755, files 644)
+  file:
+    path: "{{ console_web_root }}"
+    state: directory
+    owner: "{{ console_web_user }}"
+    group: "{{ console_web_group }}"
+    mode: 'u=rwX,g=rX,o=rX'
+    recurse: yes
+  notify: reload nginx
+
+- name: Deploy console build subdirectories with correct permissions
+  file:
+    path: "{{ console_web_root }}/{{ item }}"
+    state: directory
+    owner: "{{ console_web_user }}"
+    group: "{{ console_web_group }}"
+    mode: '0755'
+    recurse: yes
+  loop:
+    - "assets"
+  failed_when: false
+
+# 7. Nginx
+- name: Deploy nginx site configuration
+  template:
+    src: nginx-polaris-console.conf.j2
+    dest: /etc/nginx/sites-available/polaris-console.conf
+    mode: '0644'
+  notify:
+    - reload nginx
+
+- name: Enable nginx site
+  file:
+    src: /etc/nginx/sites-available/polaris-console.conf
+    dest: /etc/nginx/sites-enabled/polaris-console.conf
+    state: link
+  notify:
+    - reload nginx
+
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify:
+    - reload nginx
+
+- name: Validate nginx configuration
+  command: nginx -t
+  changed_when: false
+
+- name: Start and enable nginx
+  systemd:
+    name: nginx
+    state: "{{ 'started' if console_start_service else 'stopped' }}"
+    enabled: "{{ console_enable_service }}"
+    daemon_reload: yes
+
+- name: Wait for console to be available
+  wait_for:
+    port: "{{ console_http_port }}"
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 5
+    timeout: 60
+  when: console_start_service
+
+- name: Verify console HTTP response
+  uri:
+    url: "http://127.0.0.1:{{ console_http_port }}/"
+    status_code: 200
+    return_content: false
+  register: console_http_check
+  when: console_start_service
+
+- name: Display console status
+  debug:
+    msg: "Polaris Console is available at http://{{ ansible_default_ipv4.address | default(console_server_name) }}:{{ console_http_port }}/"
+  when: console_start_service

@@ -1,0 +1,55 @@
+---
+# Install Node.js {{ nodejs_major_version }} on Ubuntu (NodeSource repository)
+
+- name: Check if Node.js is already installed
+  command: node --version
+  register: node_check
+  failed_when: false
+  changed_when: false
+
+- name: Set Node.js facts
+  set_fact:
+    node_version_ok: "{{ node_check.rc == 0 and (node_check.stdout | regex_replace('^v(\\d+)\\..*', '\\1') | int) >= nodejs_major_version | int }}"
+
+- name: Display Node.js status
+  debug:
+    msg: "Node.js detected: {{ node_check.stdout | default('not installed') }} (required >= {{ nodejs_major_version }})"
+
+- name: Install prerequisites for NodeSource repository
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+  when: not node_version_ok
+
+- name: Add NodeSource GPG key
+  shell: |
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+  args:
+    creates: /etc/apt/keyrings/nodesource.gpg
+  when: not node_version_ok
+
+- name: Add NodeSource repository
+  copy:
+    content: |
+      deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_{{ nodejs_major_version }}.x nodistro main
+    dest: /etc/apt/sources.list.d/nodesource.list
+    mode: '0644'
+  when: not node_version_ok
+  register: nodesource_repo
+
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+  when: not node_version_ok
+  retries: 3
+  delay: 10
+  register: nodejs_install
+  until: nodejs_install is succeeded
+

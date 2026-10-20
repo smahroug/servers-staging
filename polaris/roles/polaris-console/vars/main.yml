@@ -1,0 +1,13 @@
+---
+# Environment-specific variables can be overridden here
+# These variables have higher precedence than defaults
+
+# Example: Point the console to a different Polaris server
+# console_polaris_api_url: "http://polaris.example.com:8181"
+
+# Example: Different console port
+# console_http_port: 8081
+
+# Example: Pin a specific polaris-tools version
+# console_repo_version: "apache-polaris-tools-1.0.0"
+

@@ -1,0 +1,17 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart nginx
+  systemd:
+    name: nginx
+    state: restarted
+  when: not ansible_check_mode and (console_start_service | default(true))
+
+- name: reload nginx
+  systemd:
+    name: nginx
+    state: reloaded
+  when: not ansible_check_mode and (console_start_service | default(true))
+
