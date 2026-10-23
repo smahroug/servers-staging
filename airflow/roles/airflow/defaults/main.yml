@@ -1,0 +1,62 @@
+---
+# ==============================================================================
+# Apache Airflow role defaults
+# Installed from pip with the official constraints file matching the version.
+# ==============================================================================
+
+# Airflow version. 2.10.x is the last branch supporting Python 3.8
+# (Ubuntu 20.04 ships Python 3.8).
+airflow_version: "2.10.5"
+# Constraints pin every dependency to a known-good combination.
+# Adjust the "-3.8" suffix if the target runs a newer Python.
+airflow_constraints_url: "https://raw.githubusercontent.com/apache/airflow/constraints-{{ airflow_version }}/constraints-3.8.txt"
+
+# System user, group and directories
+airflow_user: "airflow"
+airflow_group: "airflow"
+airflow_home: "/opt/airflow"
+airflow_venv: "/opt/airflow-venv"
+airflow_dags_folder: "{{ airflow_home }}/dags"
+airflow_logs_dir: "{{ airflow_home }}/logs"
+
+# Web UI
+airflow_webserver_port: 8080
+airflow_web_server_host: "0.0.0.0"
+# URL advertised by the UI (links, redirects). Derived from the inventory
+# ansible_host (the host-only IP reachable from the Mac), not localhost.
+airflow_webserver_base_url: "http://{{ hostvars[inventory_hostname]['ansible_host'] | default('localhost') }}:{{ airflow_webserver_port }}"
+# Secret key used to sign session cookies; leave empty to keep a generated default.
+airflow_webserver_secret: ""
+
+# Scheduler / executor
+airflow_executor: "LocalExecutor"
+airflow_default_timezone: "utc"
+airflow_load_examples: false
+airflow_parallelism: 32
+airflow_max_active_tasks_per_dag: 16
+airflow_max_active_runs_per_dag: 16
+# Fernet key used to encrypt connection passwords in the metadata DB.
+# Leave empty to let Airflow generate one at first start.
+airflow_fernet_key: ""
+
+# Metadata database (PostgreSQL, installed and initialized by the role)
+airflow_db_name: "airflow"
+airflow_db_user: "airflow"
+airflow_db_password: "airflow"
+airflow_db_port: 5432
+airflow_db_conn: "postgresql+psycopg2://{{ airflow_db_user }}:{{ airflow_db_password }}@localhost:{{ airflow_db_port }}/{{ airflow_db_name }}"
+
+# Admin user for the Web UI
+airflow_admin_user: "admin"
+airflow_admin_password: "admin"
+airflow_admin_firstname: "Airflow"
+airflow_admin_lastname: "Admin"
+airflow_admin_email: "admin@example.com"
+
+# Services
+airflow_start_services: true
+airflow_enable_services: true
+
+# Log rotation
+airflow_log_max_files: 15
+airflow_log_max_size: "100MB"

@@ -1,0 +1,41 @@
+[Unit]
+Description=Apache Airflow Webserver (UI)
+Documentation=https://airflow.apache.org/docs/
+After=network-online.target postgresql.service airflow-scheduler.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ airflow_user }}
+Group={{ airflow_group }}
+Environment="AIRFLOW_HOME={{ airflow_home }}"
+Environment="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN={{ airflow_db_conn }}"
+Environment="PATH={{ airflow_venv }}/bin:/usr/bin:/bin"
+ExecStart={{ airflow_venv }}/bin/airflow webserver --port {{ airflow_webserver_port }}
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths={{ airflow_home }} {{ airflow_logs_dir }}
+
+# Process management
+KillMode=mixed
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Enhanced restart behavior
+StartLimitInterval=300
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

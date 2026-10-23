@@ -1,0 +1,19 @@
+# Security hardening profile for Apache Airflow
+# Copy to roles/airflow/vars/main.yml to apply:
+#   cp vars-examples/security.yml roles/airflow/vars/main.yml
+
+# Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"
+airflow_webserver_secret: "GENERATE_AND_PASTE_A_64_CHAR_RANDOM_HEX"
+
+# Generate with: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+airflow_fernet_key: "GENERATE_AND_PASTE_A_FERNET_KEY"
+
+# Dedicated DB credentials (use ansible-vault)
+airflow_db_user: "airflow"
+airflow_db_password: "STRONG_DB_PASSWORD_HERE"
+
+# Web UI admin (use ansible-vault)
+airflow_admin_user: "airflowadmin"
+airflow_admin_password: "STRONG_UI_PASSWORD_HERE"
+airflow_admin_email: "airflow-admin@company.com"
+

@@ -1,0 +1,13 @@
+---
+- name: Deploy Apache Airflow (scheduler + webserver UI)
+  hosts: airflow_servers
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - airflow
+
+  tags:
+    - airflow
+    - deployment
+

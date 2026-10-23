@@ -1,0 +1,314 @@
+---
+# ==============================================================================
+# Apache Airflow installation tasks (scheduler + webserver UI)
+# Target: Ubuntu 20.04, Python 3.8 -> Airflow 2.10.5 with constraints-3.8
+# ==============================================================================
+
+# 1. System packages ---------------------------------------------------------
+- name: Install required system packages
+  package:
+    name:
+      - python3-pip
+      - python3-dev
+      - python3-venv
+      - libpq-dev
+      - postgresql
+      - postgresql-contrib
+      - postgresql-client
+      - python3-psycopg2
+      - sudo
+      - curl
+      - libpq5
+    state: present
+    update_cache: yes
+  retries: 5
+  delay: 10
+  register: pkgs
+  until: pkgs is succeeded
+
+# 2. PostgreSQL setup --------------------------------------------------------
+- name: Ensure PostgreSQL is started and enabled
+  systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+
+- name: Wait for PostgreSQL to accept connections
+  wait_for:
+    port: "{{ airflow_db_port }}"
+    host: 127.0.0.1
+    timeout: 60
+
+- name: Create Airflow database user
+  become_user: postgres
+  community.general.postgresql_user:
+    name: "{{ airflow_db_user }}"
+    password: "{{ airflow_db_password }}"
+  when: not ansible_check_mode
+
+- name: Create Airflow database
+  become_user: postgres
+  community.general.postgresql_db:
+    name: "{{ airflow_db_name }}"
+    owner: "{{ airflow_db_user }}"
+  when: not ansible_check_mode
+
+- name: Grant privileges on the database to the Airflow user
+  become_user: postgres
+  community.general.postgresql_privs:
+    db: "{{ airflow_db_name }}"
+    role: "{{ airflow_db_user }}"
+    type: database
+    priv: ALL
+  when: not ansible_check_mode
+
+# 3. Airflow user and directories --------------------------------------------
+- name: Create airflow group
+  group:
+    name: "{{ airflow_group }}"
+    state: present
+
+- name: Create airflow user
+  user:
+    name: "{{ airflow_user }}"
+    group: "{{ airflow_group }}"
+    system: yes
+    shell: /bin/bash
+    home: "{{ airflow_home }}"
+    create_home: no
+
+- name: Create airflow directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ airflow_user }}"
+    group: "{{ airflow_group }}"
+    mode: '0755'
+  loop:
+    - "{{ airflow_home }}"
+    - "{{ airflow_dags_folder }}"
+    - "{{ airflow_logs_dir }}"
+    - "{{ airflow_logs_dir }}/scheduler"
+
+# 3b. Secret keys (webserver secret_key is MANDATORY: an empty one crashes
+# every page with "AttributeError: 'NoneType' object has no attribute 'sign'")
+- name: Persist a webserver secret key if none provided
+  shell: "openssl rand -hex 32 > {{ airflow_home }}/.webserver_secret_key"
+  args:
+    creates: "{{ airflow_home }}/.webserver_secret_key"
+  when: airflow_webserver_secret | length == 0
+
+- name: Read persisted webserver secret key
+  slurp:
+    src: "{{ airflow_home }}/.webserver_secret_key"
+  register: webserver_secret_slurp
+  when: airflow_webserver_secret | length == 0
+
+- name: Persist a fernet key if none provided (used to encrypt secrets in the DB)
+  shell: >
+    {{ airflow_venv }}/bin/python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+    > {{ airflow_home }}/.fernet_key
+  args:
+    creates: "{{ airflow_home }}/.fernet_key"
+  when: airflow_fernet_key | length == 0
+
+- name: Read persisted fernet key
+  slurp:
+    src: "{{ airflow_home }}/.fernet_key"
+  register: fernet_key_slurp
+  when: airflow_fernet_key | length == 0
+
+- name: Secure the persisted key files
+  file:
+    path: "{{ item }}"
+    owner: "{{ airflow_user }}"
+    group: "{{ airflow_group }}"
+    mode: '0600'
+  loop:
+    - "{{ airflow_home }}/.webserver_secret_key"
+    - "{{ airflow_home }}/.fernet_key"
+  failed_when: false
+
+- name: Set effective secret keys for the config template
+  set_fact:
+    airflow_webserver_secret_effective: >-
+      {{ airflow_webserver_secret if (airflow_webserver_secret | length > 0)
+         else (webserver_secret_slurp.content | b64decode | trim) }}
+    airflow_fernet_key_effective: >-
+      {{ airflow_fernet_key if (airflow_fernet_key | length > 0)
+         else (fernet_key_slurp.content | b64decode | trim) }}
+
+# 4. Python virtual environment ----------------------------------------------
+- name: Check if the Airflow venv already exists
+  stat:
+    path: "{{ airflow_venv }}/bin/airflow"
+  register: airflow_venv_bin
+
+- name: Create python venv for Airflow
+  command: "/usr/bin/python3 -m venv {{ airflow_venv }}"
+  args:
+    creates: "{{ airflow_venv }}/bin/pip"
+  when: not airflow_venv_bin.stat.exists
+
+- name: Upgrade pip, wheel and setuptools in the venv
+  pip:
+    name:
+      - pip
+      - wheel
+      - setuptools
+    state: latest
+    virtualenv: "{{ airflow_venv }}"
+  retries: 3
+  delay: 10
+  register: pip_upgrade
+  until: pip_upgrade is succeeded
+
+# 5. Install Airflow with pinned constraints ---------------------------------
+- name: Install Airflow with constraints (long task, may take several minutes)
+  pip:
+    name: "apache-airflow[postgres]=={{ airflow_version }}"
+    virtualenv: "{{ airflow_venv }}"
+    extra_args: "--constraint {{ airflow_constraints_url }}"
+  retries: 3
+  delay: 15
+  async: 3600
+  poll: 30
+  register: airflow_install
+  until: airflow_install is succeeded
+
+- name: Check installed Airflow version
+  command: "{{ airflow_venv }}/bin/airflow version"
+  become_user: "{{ airflow_user }}"
+  register: airflow_version_check
+  changed_when: false
+  failed_when: airflow_version_check.rc != 0
+
+- name: Display installed Airflow version
+  debug:
+    msg: "Airflow installed: {{ airflow_version_check.stdout | trim }}"
+  when: airflow_version_check.stdout is defined
+
+# 6. Airflow configuration ----------------------------------------------------
+- name: Generate airflow.cfg
+  template:
+    src: airflow.cfg.j2
+    dest: "{{ airflow_home }}/airflow.cfg"
+    owner: "{{ airflow_user }}"
+    group: "{{ airflow_group }}"
+    mode: '0640'
+    backup: yes
+  notify:
+    - restart airflow-scheduler
+    - restart airflow-webserver
+
+- name: Initialize the metadata database (idempotent, runs migrate if needed)
+  command: "{{ airflow_venv }}/bin/airflow db migrate"
+  become_user: "{{ airflow_user }}"
+  environment:
+    AIRFLOW_HOME: "{{ airflow_home }}"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "{{ airflow_db_conn }}"
+  args:
+    chdir: "{{ airflow_home }}"
+  when: not ansible_check_mode
+  register: db_migrate
+  changed_when: db_migrate.rc == 0
+
+# 7. Admin user for the Web UI -------------------------------------------------
+- name: Check if the admin user already exists
+  command: "{{ airflow_venv }}/bin/airflow users list"
+  become_user: "{{ airflow_user }}"
+  environment:
+    AIRFLOW_HOME: "{{ airflow_home }}"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "{{ airflow_db_conn }}"
+  register: airflow_users_list
+  changed_when: false
+  failed_when: false
+
+- name: Create the Airflow admin user (Web UI login)
+  command: >
+    {{ airflow_venv }}/bin/airflow users create
+    --username {{ airflow_admin_user }}
+    --password {{ airflow_admin_password }}
+    --firstname {{ airflow_admin_firstname }}
+    --lastname {{ airflow_admin_lastname }}
+    --role Admin
+    --email {{ airflow_admin_email }}
+  become_user: "{{ airflow_user }}"
+  environment:
+    AIRFLOW_HOME: "{{ airflow_home }}"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "{{ airflow_db_conn }}"
+  when:
+    - not ansible_check_mode
+    - airflow_users_list.stdout is defined
+    - airflow_users_list.stdout is not search(airflow_admin_user)
+  no_log: true
+
+# 8. systemd services -----------------------------------------------------------
+- name: Create airflow-scheduler systemd service
+  template:
+    src: airflow-scheduler.service.j2
+    dest: /etc/systemd/system/airflow-scheduler.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart airflow-scheduler
+
+- name: Create airflow-webserver systemd service (Web UI)
+  template:
+    src: airflow-webserver.service.j2
+    dest: /etc/systemd/system/airflow-webserver.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart airflow-webserver
+
+- name: Configure log rotation for Airflow logs
+  copy:
+    content: |
+      {{ airflow_logs_dir }}/*.log {
+          daily
+          missingok
+          rotate {{ airflow_log_max_files }}
+          compress
+          notifempty
+          create 644 {{ airflow_user }} {{ airflow_group }}
+          size {{ airflow_log_max_size }}
+          copytruncate
+      }
+    dest: /etc/logrotate.d/airflow
+    mode: '0644'
+
+- name: Start and enable Airflow services
+  systemd:
+    name: "{{ item }}"
+    state: "{{ 'started' if airflow_start_services else 'stopped' }}"
+    enabled: "{{ airflow_enable_services }}"
+    daemon_reload: yes
+  loop:
+    - airflow-scheduler
+    - airflow-webserver
+  when: not ansible_check_mode
+
+- name: Wait for the Airflow webserver port to be available
+  wait_for:
+    port: "{{ airflow_webserver_port }}"
+    host: "{{ airflow_web_server_host }}"
+    delay: 10
+    timeout: 180
+  when: airflow_start_services
+
+- name: Verify the Web UI responds
+  uri:
+    url: "http://127.0.0.1:{{ airflow_webserver_port }}/health"
+    return_content: yes
+  register: airflow_health
+  retries: 6
+  delay: 10
+  until: airflow_health.status == 200
+  when: airflow_start_services and not ansible_check_mode
+
+- name: Display Airflow Web UI information
+  debug:
+    msg: >-
+      Airflow Web UI: http://{{ ansible_default_ipv4.address | default(inventory_hostname) }}:{{ airflow_webserver_port }}
+      (login: {{ airflow_admin_user }} / {{ airflow_admin_password }})

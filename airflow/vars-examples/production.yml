@@ -1,0 +1,24 @@
+# Production profile for Apache Airflow
+# Copy to roles/airflow/vars/main.yml to apply:
+#   cp vars-examples/production.yml roles/airflow/vars/main.yml
+
+# Never load example DAGs in production
+airflow_load_examples: false
+
+# Higher parallelism
+airflow_parallelism: 64
+airflow_max_active_tasks_per_dag: 32
+airflow_max_active_runs_per_dag: 16
+
+# Dedicated DB credentials (store password in ansible-vault in real setups)
+airflow_db_password: "CHANGE_ME_VAULT"
+
+# Secure the Web UI
+airflow_webserver_secret: "CHANGE_ME_RANDOM_64_CHAR_STRING"
+airflow_admin_user: "admin"
+airflow_admin_password: "CHANGE_ME_VAULT"
+airflow_admin_email: "airflow-admin@company.com"
+
+# Central logging
+airflow_logs_dir: "/var/log/airflow"
+

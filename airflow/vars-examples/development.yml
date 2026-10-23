@@ -1,0 +1,19 @@
+# Development profile for Apache Airflow
+# Copy to roles/airflow/vars/main.yml to apply:
+#   cp vars-examples/development.yml roles/airflow/vars/main.yml
+
+# Load example DAGs for demo environments
+airflow_load_examples: true
+
+# Small resource footprint for the dev VM
+airflow_parallelism: 8
+airflow_max_active_tasks_per_dag: 4
+airflow_max_active_runs_per_dag: 4
+
+# Don't stress the webserver
+airflow_webserver_port: 8080
+
+# Simple credentials for dev only
+airflow_admin_user: "admin"
+airflow_admin_password: "admin"
+

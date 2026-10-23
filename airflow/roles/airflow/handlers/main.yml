@@ -1,0 +1,17 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart airflow-scheduler
+  systemd:
+    name: airflow-scheduler
+    state: restarted
+  when: not ansible_check_mode and (airflow_start_services | default(true))
+
+- name: restart airflow-webserver
+  systemd:
+    name: airflow-webserver
+    state: restarted
+  when: not ansible_check_mode and (airflow_start_services | default(true))
+

@@ -1,0 +1,97 @@
+---
+- name: Uninstall Apache Airflow
+  hosts: airflow_servers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    airflow_home: /opt/airflow
+    airflow_venv: /opt/airflow-venv
+    airflow_logs_dir: /opt/airflow/logs
+    airflow_db_name: airflow
+    airflow_db_user: airflow
+    airflow_user: airflow
+
+  tasks:
+    - name: Stop Airflow services
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - airflow-scheduler
+        - airflow-webserver
+      ignore_errors: yes
+
+    - name: Disable Airflow services
+      systemd:
+        name: "{{ item }}"
+        enabled: no
+      loop:
+        - airflow-scheduler
+        - airflow-webserver
+      ignore_errors: yes
+
+    - name: Remove Airflow systemd service files
+      file:
+        path: "/etc/systemd/system/{{ item }}.service"
+        state: absent
+      loop:
+        - airflow-scheduler
+        - airflow-webserver
+
+    - name: Remove Airflow log rotation configuration
+      file:
+        path: /etc/logrotate.d/airflow
+        state: absent
+      ignore_errors: yes
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Drop the Airflow database
+      become_user: postgres
+      community.general.postgresql_db:
+        name: "{{ airflow_db_name }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Drop the Airflow database user
+      become_user: postgres
+      community.general.postgresql_user:
+        name: "{{ airflow_db_user }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove Airflow home and venv
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ airflow_home }}"
+        - "{{ airflow_venv }}"
+
+    - name: Remove airflow user
+      user:
+        name: "{{ airflow_user }}"
+        state: absent
+        remove: yes
+      ignore_errors: yes
+
+    - name: Remove airflow group
+      group:
+        name: "{{ airflow_user }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Display uninstallation summary
+      debug:
+        msg: |
+          Airflow has been successfully uninstalled.
+          Removed:
+          - airflow-scheduler and airflow-webserver services
+          - {{ airflow_home }} (DAGs, config, logs)
+          - {{ airflow_venv }} (Python venv)
+          - PostgreSQL database {{ airflow_db_name }} and user {{ airflow_db_user }}
+          - Log rotation configuration
+          - airflow user and group

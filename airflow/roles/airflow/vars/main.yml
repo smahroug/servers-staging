@@ -1,0 +1,17 @@
+---
+# Environment-specific variables can be overridden here
+# These variables have higher precedence than defaults
+
+# Example: Newer Airflow on a VM with Python >= 3.9
+# airflow_version: "2.9.3"
+# airflow_constraints_url: "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.11.txt"
+
+# Example: Secure the Web UI with a custom secret key (recommended)
+# airflow_webserver_secret: "change-me-to-a-long-random-string"
+
+# Example: Remote metadata database instead of the local PostgreSQL
+# airflow_db_conn: "postgresql+psycopg2://airflow:secret@db-host:5432/airflow"
+
+# Example: Load the bundled example DAGs for demo environments
+# airflow_load_examples: true
+
