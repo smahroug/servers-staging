@@ -90,6 +90,14 @@
     - "{{ airflow_logs_dir }}"
     - "{{ airflow_logs_dir }}/scheduler"
 
+- name: Ensure scheduler log subdirectory exists
+  file:
+    path: "{{ airflow_logs_dir }}/scheduler"
+    state: directory
+    owner: "{{ airflow_user }}"
+    group: "{{ airflow_group }}"
+    mode: '0755'
+
 # 3b. Secret keys (webserver secret_key is MANDATORY: an empty one crashes
 # every page with "AttributeError: 'NoneType' object has no attribute 'sign'")
 - name: Persist a webserver secret key if none provided
@@ -312,3 +320,16 @@
     msg: >-
       Airflow Web UI: http://{{ ansible_default_ipv4.address | default(inventory_hostname) }}:{{ airflow_webserver_port }}
       (login: {{ airflow_admin_user }} / {{ airflow_admin_password }})
+
+- name: Deploy the bundled sample DAGs (tutorial + staging_report)
+  copy:
+    src: "{{ item }}"
+    dest: "{{ airflow_dags_folder }}/"
+    owner: "{{ airflow_user }}"
+    group: "{{ airflow_group }}"
+    mode: '0644'
+  with_fileglob:
+    - "../files/*.py"
+  when: airflow_deploy_tutorial_dag | bool
+  notify:
+    - restart airflow-scheduler

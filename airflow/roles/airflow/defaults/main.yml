@@ -60,3 +60,6 @@ airflow_enable_services: true
 # Log rotation
 airflow_log_max_files: 15
 airflow_log_max_size: "100MB"
+
+# Deploy the Apache Airflow tutorial DAG into the dags folder
+airflow_deploy_tutorial_dag: true
