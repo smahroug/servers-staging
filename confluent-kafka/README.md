@@ -14,6 +14,7 @@ The role deploys the full Confluent stack via Docker Compose:
 | Kafka REST Proxy | `confluentinc/cp-kafka-rest` | `kafka-rest` | 8082 |
 | ksqlDB Server | `confluentinc/cp-ksqldb-server` | `ksqldb-server` | 8088 |
 | Control Center Next-Gen | `confluentinc/cp-enterprise-control-center-next-gen` | `control-center` | 9021 |
+| kafka-ui (kafbat) | `kafbat/kafka-ui` | `kafka-ui` | 8090 |
 | Prometheus (metrics) | `confluentinc/cp-enterprise-prometheus` | `prometheus` | 9090 |
 | Alertmanager | `confluentinc/cp-enterprise-alertmanager` | `alertmanager` | 9095 (container 9093) |
 
@@ -31,6 +32,7 @@ Kafka runs in **KRaft mode** (no ZooKeeper) — ZooKeeper is deprecated since Co
 - **Latest Community Edition**: pulls the latest `confluentinc/cp-*` images (multi-arch: amd64 + arm64)
 - **KRaft single-node cluster** (combined controller+broker)
 - **Auto topic creation** enabled for quick start
+- **kafbat/kafka-ui** web UI pre-wired to the cluster (broker, Schema Registry, Connect, ksqlDB)
 - **Health checks** on every container + `wait_for` on the Kafka port
 - **Idempotent**: re-running the playbook only applies changes
 - **Uninstall playbook** that removes containers, images, volumes and config
@@ -153,6 +155,9 @@ Log in to Control Center with `admin` / `admin` (staging default, see `control_c
 | `confluent_ksqldb_port` | 8088 | ksqlDB Server |
 | `confluent_control_center_port` | 9021 | Control Center Next-Gen Web UI |
 | `confluent_control_center_version` | "2.7.0" | Control Center Next-Gen image tag |
+| `kafka_ui_enabled` | true | Deploy kafbat/kafka-ui |
+| `kafka_ui_port` | 8090 | kafka-ui Web UI (host port; container listens on 8080) |
+| `kafka_ui_version` | "v1.5.0" | kafbat/kafka-ui image tag |
 | `confluent_prometheus_port` | 9090 | Prometheus metrics UI |
 | `confluent_alertmanager_port` | 9095 | Alertmanager (host port; container listens on 9093) |
 | `confluent_kafka_heap` | "1G" | Kafka broker heap |
@@ -177,6 +182,7 @@ VM host-only IP (default **`192.168.56.5`** — see the ⚠️ note below).
 | **Kafka REST Proxy** | `http://192.168.56.5:8082` | 8082 | none | Produce/consume over HTTP (`/v3/clusters`) |
 | **ksqlDB Server** | `http://192.168.56.5:8088` | 8088 | none | ksql queries (`/info`, `/query`, websocket `/query.ws`) |
 | **Control Center Next-Gen** | `http://192.168.56.5:9021` | 9021 | `admin` / `admin` | Web UI (clusters, topics, consumers, Connect, ksqlDB) |
+| **kafka-ui (kafbat)** | `http://192.168.56.5:8090` | 8090 | none | Lightweight web UI: browse topics/messages, consumer groups, schema registry, Connect |
 | **Prometheus** | `http://192.168.56.5:9090` | 9090 | none | Broker metrics, PromQL queries (`/api/v1/query`), targets |
 | **Alertmanager** | `http://192.168.56.5:9095` | 9095 | none | Alerts UI/API (container listens on 9093, host port 9095) |
 

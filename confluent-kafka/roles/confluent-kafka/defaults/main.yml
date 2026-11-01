@@ -36,6 +36,14 @@ confluent_kafka_log_retention_hours: 168
 confluent_schema_registry_port: 8081
 confluent_schema_registry_heap: "512M"
 
+# kafbat/kafka-ui (web UI for Kafka)
+kafka_ui_enabled: true
+kafka_ui_image: "kafbat/kafka-ui"
+kafka_ui_version: "v1.5.0"
+kafka_ui_port: 8090
+# Distinguish clusters in the UI; points at the internal broker listener
+kafka_ui_cluster_name: "staging-kafka-cluster-01"
+
 # Kafka Connect (distributed mode)
 confluent_connect_enabled: true
 confluent_connect_port: 8083

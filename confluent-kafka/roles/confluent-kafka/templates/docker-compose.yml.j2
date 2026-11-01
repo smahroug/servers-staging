@@ -82,6 +82,27 @@ services:
       retries: 10
       start_period: 60s
 
+{% if kafka_ui_enabled | bool %}
+  kafka-ui:
+    image: {{ kafka_ui_image }}:{{ kafka_ui_version }}
+    container_name: kafka-ui
+    hostname: kafka-ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "{{ kafka_ui_port }}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "{{ kafka_ui_cluster_name }}"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:{{ confluent_kafka_port_internal }}"
+      KAFKA_CLUSTERS_0_SCHEMA_REGISTRY: "http://schema-registry:{{ confluent_schema_registry_port }}"
+      KAFKA_CLUSTERS_0_KAFKACONNECT_ADDRESS: "http://connect:{{ confluent_connect_port }}"
+      KAFKA_CLUSTERS_0_KSQLDB_URL: "http://ksqldb-server:{{ confluent_ksqldb_port }}"
+      DYNAMIC_CONFIG_ENABLED: "true"
+      SPRING_CONFIG_ADDITIONAL_LOCATION: "optional:file:/kafka-ui/"
+
+{% endif %}
 {% if confluent_connect_enabled | bool %}
   connect:
     image: {{ confluent_image_repo_prefix }}/cp-kafka-connect:{{ confluent_version }}
