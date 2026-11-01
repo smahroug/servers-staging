@@ -36,6 +36,15 @@ confluent_kafka_log_retention_hours: 168
 confluent_schema_registry_port: 8081
 confluent_schema_registry_heap: "512M"
 
+# Kafka Connect (distributed mode)
+confluent_connect_enabled: true
+confluent_connect_port: 8083
+confluent_connect_group_id: "staging-connect-cluster"
+confluent_connect_offset_topic: "staging-connect-offsets"
+confluent_connect_config_topic: "staging-connect-configs"
+confluent_connect_status_topic: "staging-connect-status"
+confluent_connect_heap: "512M"
+
 # Kafka REST Proxy
 confluent_kafka_rest_port: 8082
 

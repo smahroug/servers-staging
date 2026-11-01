@@ -10,6 +10,7 @@ The role deploys the full Confluent stack via Docker Compose:
 |-----------|-------|-----------|--------------|
 | Kafka broker (KRaft) | `confluentinc/cp-server` | `kafka` | 9092 (internal), 9093 (Docker host) |
 | Schema Registry | `confluentinc/cp-schema-registry` | `schema-registry` | 8081 |
+| Kafka Connect (distributed) | `confluentinc/cp-kafka-connect` | `connect` | 8083 |
 | Kafka REST Proxy | `confluentinc/cp-kafka-rest` | `kafka-rest` | 8082 |
 | ksqlDB Server | `confluentinc/cp-ksqldb-server` | `ksqldb-server` | 8088 |
 | Control Center Next-Gen | `confluentinc/cp-enterprise-control-center-next-gen` | `control-center` | 9021 |
@@ -147,6 +148,8 @@ Log in to Control Center with `admin` / `admin` (staging default, see `control_c
 | `confluent_kafka_port_host` | 9093 | Kafka listener exposed on the VM (Docker host) |
 | `confluent_schema_registry_port` | 8081 | Schema Registry |
 | `confluent_kafka_rest_port` | 8082 | Kafka REST Proxy |
+| `confluent_connect_enabled` | true | Deploy Kafka Connect |
+| `confluent_connect_port` | 8083 | Kafka Connect REST API |
 | `confluent_ksqldb_port` | 8088 | ksqlDB Server |
 | `confluent_control_center_port` | 9021 | Control Center Next-Gen Web UI |
 | `confluent_control_center_version` | "2.7.0" | Control Center Next-Gen image tag |
@@ -167,6 +170,7 @@ Log in to Control Center with `admin` / `admin` (staging default, see `control_c
 | Kafka (external) | 9093 | Broker listener on the Docker host — use this from the Mac/Flink |
 | Kafka (internal) | 9092 | Broker listener inside the compose network |
 | Schema Registry | 8081 | Avro/JSON schema management API |
+| Kafka Connect | 8083 | Connect distributed REST API |
 | Kafka REST | 8082 | REST proxy for Kafka |
 | ksqlDB | 8088 | ksqlDB server |
 | Control Center Next-Gen | 9021 | Web UI |
