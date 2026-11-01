@@ -2,6 +2,46 @@
 
 Checklist et procédures à exécuter lorsqu'un nouveau serveur/VM est provisionné.
 
+## 0. Activer la carte host-only (si la VM n'a que la NAT)
+
+Si la VM a été créée avec une seule carte (NAT sur `nic1`), la carte host-only n'existe pas : `192.168.56.x` est injoignable et `nic2` vaut `none` dans `showvminfo`.
+
+### Sur l'hôte (Mac) — VM éteinte obligatoire
+
+```bash
+VB=/Applications/VirtualBox.app/Contents/MacOS/VBoxManage
+$VB controlvm <vm> acpipowerbutton          # arrêt propre (modifyvm refuse sur une VM allumée)
+$VB modifyvm <vm> --nic2 hostonlynet --host-only-net2 vboxnet0 --nictype2 82540EM --cableconnected2 on
+$VB startvm <vm> --type headless
+```
+
+> ⚠️ **VirtualBox 7+ :** le type d'attachement est `hostonlynet` avec `--host-only-net2 <nom du réseau>` (ex. `vboxnet0`). L'ancienne syntaxe `--nic2 hostonly --hostonlyadapter2 vboxnet0` est rejetée au démarrage (`Host-only adapters are no longer supported!`). Le hot-plug sur une VM allumée (`controlvm <vm> nic2 ...`) échoue avec `The NIC 2 is currently disabled` : passer impérativement par un arrêt + `modifyvm`.
+
+### Dans la VM — configurer le netplan des deux interfaces
+
+La carte ajoutée après l'installation apparaît sous un **nouveau nom** (ex. `enp0s9`) et reste DOWN : le netplan d'installation ne la référence pas. Vérifier les noms avec `ip -o link show` (les MAC identifient chaque carte : `VBoxManage showvminfo <vm> --machinereadable | grep macaddress2`).
+
+```bash
+sudo -s
+mkdir -p /root/netplan-backup && cp /etc/netplan/*.yaml /root/netplan-backup/
+rm -f /etc/netplan/*.yaml
+cat > /etc/netplan/00-staging.yaml <<'EOF'
+network:
+  version: 2
+  ethernets:
+    enp0s8:            # NAT -> internet, DHCP 10.0.2.15
+      dhcp4: true
+    enp0s9:            # host-only vboxnet0 -> IP fixe staging
+      dhcp4: false
+      addresses: [192.168.56.5/24]
+EOF
+chmod 600 /etc/netplan/00-staging.yaml
+netplan apply
+ip -brief address
+```
+
+> Adapter les noms d'interfaces et l'IP fixe à chaque VM. Si SSH n'est pas encore installé, le faire d'abord via la console (étape 1) ou via un port-forward NAT temporaire (voir section 5).
+
 ## 1. Démarrer le serveur SSH
 
 Si le port 22 est fermé, le service SSH n'est probablement pas installé ou démarré sur la VM.
@@ -79,6 +119,8 @@ Chaque VM doit avoir **2 cartes réseau** dans VirtualBox :
 |-------|------|------|-------------|
 | Adapter 1 | NAT | Accès internet | `10.0.2.15` (DHCP VirtualBox) |
 | Adapter 2 | Host-only (`vboxnet0`) | Accès depuis le Mac / LAN staging | `192.168.56.x` |
+
+> 💡 Si la carte host-only n'existe pas encore (VM créée avec NAT seul), suivre la **section 0** d'abord.
 
 ⚠️ **Piège connu :** si la carte NAT est ajoutée **après** l'installation (comme carte 1), l'invité Debian/Ubuntu **renomme** les interfaces : l'ancienne interface host-only passe de `enp0s8` à `enp0s9` et se retrouve **DOWN** (le netplan d'installation ne référençait que `enp0s8`). Résultat : le `192.168.56.x` disparaît alors que la carte VirtualBox semble bien configurée.
 
