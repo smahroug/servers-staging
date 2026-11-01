@@ -29,6 +29,12 @@ services:
       KAFKA_JMX_PORT: "9101"
       KAFKA_JMX_HOSTNAME: "kafka"
       KAFKA_HEAP_OPTS: "-Xmx{{ confluent_kafka_heap }} -Xms{{ confluent_kafka_heap }}"
+{% if confluent_authorizer_enabled | bool %}
+      KAFKA_AUTHORIZER_CLASS_NAME: "{{ confluent_authorizer_class }}"
+      KAFKA_SUPER_USERS: "{{ confluent_super_users }}"
+      # allow everything on the PLAINTEXT listeners (staging: no auth, but ACL store usable)
+      KAFKA_AUTHORIZER_ALLOW_EVERYONE_IF_NO_ACL_IS_FOUND: "true"
+{% endif %}
       # Telemetry exporter feeding Control Center Next-Gen via Prometheus
       KAFKA_METRIC_REPORTERS: "io.confluent.telemetry.reporter.TelemetryReporter"
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: "kafka:{{ confluent_kafka_port_internal }}"
@@ -97,7 +103,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: "{{ kafka_ui_cluster_name }}"
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:{{ confluent_kafka_port_internal }}"
       KAFKA_CLUSTERS_0_SCHEMA_REGISTRY: "http://schema-registry:{{ confluent_schema_registry_port }}"
-      KAFKA_CLUSTERS_0_KAFKACONNECT_ADDRESS: "http://connect:{{ confluent_connect_port }}"
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: "connect-default"
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: "http://connect:{{ confluent_connect_port }}"
       KAFKA_CLUSTERS_0_KSQLDB_URL: "http://ksqldb-server:{{ confluent_ksqldb_port }}"
       DYNAMIC_CONFIG_ENABLED: "true"
       SPRING_CONFIG_ADDITIONAL_LOCATION: "optional:file:/kafka-ui/"

@@ -19,6 +19,15 @@ docker_packages_state: present
 confluent_compose_project: "confluent"
 confluent_compose_dir: "/opt/confluent-kafka"
 
+# Security / ACLs
+# Enable the standard Kafka authorizer so ACLs can be listed/managed (kafka-ui
+# ACL page and kafka-acls CLI). With PLAINTEXT listeners the authorizer is
+# effectively advisory (no authentication), but the ACL store works.
+confluent_authorizer_enabled: true
+confluent_authorizer_class: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+# super.users for the broker's own inter-broker user (KRaft controller)
+confluent_super_users: "User:ANONYMOUS"
+
 # Kafka broker (KRaft, no ZooKeeper)
 confluent_cluster_id: "staging-kafka-cluster-01"
 confluent_kafka_node_id: 1

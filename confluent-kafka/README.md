@@ -32,7 +32,7 @@ Kafka runs in **KRaft mode** (no ZooKeeper) — ZooKeeper is deprecated since Co
 - **Latest Community Edition**: pulls the latest `confluentinc/cp-*` images (multi-arch: amd64 + arm64)
 - **KRaft single-node cluster** (combined controller+broker)
 - **Auto topic creation** enabled for quick start
-- **kafbat/kafka-ui** web UI pre-wired to the cluster (broker, Schema Registry, Connect, ksqlDB)
+- **kafbat/kafka-ui** web UI pre-wired to the cluster (broker, Schema Registry, Connect, ksqlDB, ACLs)
 - **Health checks** on every container + `wait_for` on the Kafka port
 - **Idempotent**: re-running the playbook only applies changes
 - **Uninstall playbook** that removes containers, images, volumes and config
@@ -182,7 +182,7 @@ VM host-only IP (default **`192.168.56.5`** — see the ⚠️ note below).
 | **Kafka REST Proxy** | `http://192.168.56.5:8082` | 8082 | none | Produce/consume over HTTP (`/v3/clusters`) |
 | **ksqlDB Server** | `http://192.168.56.5:8088` | 8088 | none | ksql queries (`/info`, `/query`, websocket `/query.ws`) |
 | **Control Center Next-Gen** | `http://192.168.56.5:9021` | 9021 | `admin` / `admin` | Web UI (clusters, topics, consumers, Connect, ksqlDB) |
-| **kafka-ui (kafbat)** | `http://192.168.56.5:8090` | 8090 | none | Lightweight web UI: browse topics/messages, consumer groups, schema registry, Connect |
+| **kafka-ui (kafbat)** | `http://192.168.56.5:8090` | 8090 | none | Lightweight web UI: topics/messages, consumer groups, Schema Registry, Connect, ACLs |
 | **Prometheus** | `http://192.168.56.5:9090` | 9090 | none | Broker metrics, PromQL queries (`/api/v1/query`), targets |
 | **Alertmanager** | `http://192.168.56.5:9095` | 9095 | none | Alerts UI/API (container listens on 9093, host port 9095) |
 
@@ -284,6 +284,10 @@ Removes the compose stack (containers + volumes), `/opt/confluent-kafka` and the
 
 ## Security Considerations
 
+- **ACLs**: the broker runs the `StandardAuthorizer` with
+  `allow.everyone.if.no.acl.is.found=true` (staging: no auth on PLAINTEXT, but the ACL
+  store is active and manageable via kafka-ui's **ACL** page or `kafka-acls` CLI).
+  Set `confluent_authorizer_enabled: false` to disable it.
 - Default listeners are **PLAINTEXT** — staging only. For production add SASL/SSL listeners and credentials
 - Default Control Center login `admin/admin` — override `control_center_basic_user` / `control_center_basic_password`
 - Use SSH keys + ansible-vault instead of plain passwords in the inventory
