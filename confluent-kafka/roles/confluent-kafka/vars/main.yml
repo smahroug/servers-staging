@@ -1,0 +1,15 @@
+---
+# Environment-specific variables can be overridden here
+# These variables have higher precedence than defaults
+
+# Example: pin a specific Confluent Platform version instead of latest
+# confluent_version: "8.4.0"
+
+# Example: bigger heaps for a larger VM
+# confluent_kafka_heap: "2G"
+# confluent_ksqldb_heap: "2G"
+# confluent_control_center_heap: "2G"
+
+# Example: secure Control Center (staging defaults are admin/admin)
+# control_center_basic_user: "confluentadmin"
+# control_center_basic_password: "CHANGE_ME"

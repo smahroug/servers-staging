@@ -1,0 +1,36 @@
+# Secure Inventory Configuration Template
+# Copy this file to inventory/hosts.yml and customize for your environment
+
+all:
+  children:
+    confluent_kafka_servers:
+      hosts:
+        confluent-kafka:
+          ansible_host: 10.0.1.40  # Replace with your Confluent Kafka server IP
+      vars:
+        # Security: Use SSH key authentication (recommended)
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: ~/.ssh/id_rsa
+
+        # Alternative: Use Ansible Vault for password authentication
+        # ansible_user: user
+        # ansible_password: "{{ vault_ansible_password }}"
+
+        # Privilege escalation
+        ansible_become: true
+        ansible_become_method: sudo
+
+        # Alternative: Use Ansible Vault for sudo password
+        # ansible_become_password: "{{ vault_ansible_become_password }}"
+
+        # SSH connection optimization
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+        # Connection settings
+        ansible_connection: ssh
+        ansible_python_interpreter: /usr/bin/python3
+
+        # Optional: Custom variables per environment
+        # confluent_version: "8.4.0"
+        # confluent_kafka_port_host: 9093
+        # confluent_control_center_port: 9021

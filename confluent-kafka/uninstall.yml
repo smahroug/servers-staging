@@ -1,0 +1,57 @@
+---
+- name: Uninstall Confluent Platform (Docker)
+  hosts: confluent_kafka_servers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    confluent_compose_project: confluent
+    confluent_compose_dir: /opt/confluent-kafka
+    docker_remove_packages: false   # set true to also remove Docker itself
+
+  tasks:
+    - name: Tear down the Confluent compose stack (containers + volumes)
+      command: "docker compose -p {{ confluent_compose_project }} down -v --remove-orphans"
+      args:
+        chdir: "{{ confluent_compose_dir }}"
+      failed_when: false
+      ignore_errors: yes
+
+    - name: List pulled Confluent images
+      command: "docker images --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }}' confluentinc/*"
+      register: confluent_images
+      failed_when: false
+      changed_when: false
+
+    - name: Remove pulled Confluent images
+      command: "docker rmi -f {{ item }}"
+      loop: "{{ confluent_images.stdout_lines | default([]) }}"
+      when: confluent_images.stdout_lines | default([]) | length > 0
+      ignore_errors: yes
+
+    - name: Remove Confluent compose directory
+      file:
+        path: "{{ confluent_compose_dir }}"
+        state: absent
+
+    - name: Remove Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: absent
+      when: docker_remove_packages | bool
+      ignore_errors: yes
+
+    - name: Display uninstallation summary
+      debug:
+        msg: |
+          Confluent Platform has been successfully uninstalled.
+          Removed:
+          - All Confluent containers and volumes (compose project {{ confluent_compose_project }})
+          - Pulled confluentinc/* images
+          - {{ confluent_compose_dir }}
+          Docker itself: {{ 'removed' if docker_remove_packages | bool else 'kept (docker_remove_packages: false)' }}

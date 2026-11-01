@@ -1,0 +1,76 @@
+---
+# ==============================================================================
+# Confluent Platform (Community Edition) on Docker - role defaults
+# All components: Kafka (KRaft), Schema Registry, REST Proxy, ksqlDB,
+# Control Center. Images are multi-arch (amd64 + arm64).
+# ==============================================================================
+
+# Confluent Platform image tag. "latest" tracks the newest Community release;
+# pin a version (e.g. "8.4.0") for reproducibility.
+confluent_version: "latest"
+confluent_docker_registry: "docker.io"
+confluent_image_repo_prefix: "{{ confluent_docker_registry }}/confluentinc"
+
+# Docker installation (step 1 of the role)
+confluent_install_docker: true
+docker_packages_state: present
+
+# Compose deployment
+confluent_compose_project: "confluent"
+confluent_compose_dir: "/opt/confluent-kafka"
+
+# Kafka broker (KRaft, no ZooKeeper)
+confluent_cluster_id: "staging-kafka-cluster-01"
+confluent_kafka_node_id: 1
+confluent_kafka_heap: "1G"
+confluent_kafka_port_internal: 9092   # listener inside the compose network
+confluent_kafka_port_host: 9093       # listener exposed on the Docker host (Mac/Flink access)
+confluent_kafka_controller_port: 9094 # KRaft controller (internal)
+confluent_kafka_auto_create_topics: "true"
+confluent_kafka_default_replication: 1
+confluent_kafka_offsets_replication: 1
+confluent_kafka_transaction_replication: 1
+confluent_kafka_log_retention_hours: 168
+
+# Schema Registry
+confluent_schema_registry_port: 8081
+confluent_schema_registry_heap: "512M"
+
+# Kafka REST Proxy
+confluent_kafka_rest_port: 8082
+
+# ksqlDB Server
+confluent_ksqldb_port: 8088
+confluent_ksqldb_heap: "1G"
+
+# Confluent Control Center Next-Gen (Web UI shipped with Confluent Platform 8.x)
+# The legacy cp-control-center image was retired; Platform 8.x ships
+# "Control Center Next-Gen" (cp-enterprise-control-center-next-gen) which relies
+# on a Prometheus + Alertmanager sidecar pair and a broker telemetry exporter.
+confluent_control_center_image: "cp-enterprise-control-center-next-gen"
+confluent_control_center_version: "2.7.0"
+confluent_prometheus_image: "cp-enterprise-prometheus"
+# 2.7.0 rejects the broker's delta temporality metrics ("invalid temporality and
+# type combination") so no broker metrics land in Prometheus and C3 shows no
+# brokers. 2.6.1 accepts them.
+confluent_prometheus_version: "2.6.1"
+confluent_prometheus_port: 9090
+confluent_alertmanager_image: "cp-enterprise-alertmanager"
+confluent_alertmanager_version: "2.7.0"
+confluent_alertmanager_port: 9095   # host port; container port stays 9093
+confluent_control_center_port: 9021
+confluent_control_center_heap: "1200M"
+control_center_basic_user: "admin"
+control_center_basic_password: "admin"
+
+# Addressing note: the VM IP (192.168.56.x) can change depending on VM start
+# order. The external listener advertises ansible_host by default; override
+# confluent_advertised_host in the inventory if you reach the VM by another
+# name/IP. Internal component traffic always uses Docker DNS names (kafka,
+# schema-registry, ...), so a VM IP change only affects external clients.
+confluent_advertised_host: "{{ ansible_host | default(inventory_hostname) }}"
+
+# Service behaviour
+confluent_start_services: true
+confluent_restart_containers: false   # force restart of the compose stack on re-run
+confluent_pull_images: true           # docker compose pull before up

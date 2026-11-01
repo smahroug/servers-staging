@@ -1,0 +1,137 @@
+---
+# ==============================================================================
+# Confluent Platform deployment via Docker Compose
+# Components: Kafka (KRaft), Schema Registry, REST Proxy, ksqlDB, Control Center
+# ==============================================================================
+
+- name: Create Confluent compose directory
+  file:
+    path: "{{ confluent_compose_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Generate docker-compose.yml for Confluent Platform
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ confluent_compose_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  register: compose_file
+
+- name: Open firewall for Confluent Platform ports
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ confluent_kafka_port_host }}"
+    - "{{ confluent_schema_registry_port }}"
+    - "{{ confluent_kafka_rest_port }}"
+    - "{{ confluent_ksqldb_port }}"
+    - "{{ confluent_control_center_port }}"
+    - "{{ confluent_prometheus_port }}"
+    - "{{ confluent_alertmanager_port }}"
+  when: ansible_os_family == "Debian"
+  failed_when: false
+
+- name: Deploy Prometheus / Alertmanager configuration for Control Center Next-Gen
+  include_tasks: prometheus-config.yml
+
+- name: Ensure ksqlDB state directory is writable by the container user (uid 1000)
+  file:
+    path: /var/lib/docker/volumes/{{ confluent_compose_project }}_ksqldb-data/_data
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: '0755'
+  when: not ansible_check_mode
+
+- name: Pull Confluent images (may take several minutes on first run)
+  command: "docker compose -p {{ confluent_compose_project }} pull"
+  args:
+    chdir: "{{ confluent_compose_dir }}"
+  when: confluent_pull_images | bool
+  register: compose_pull
+  until: compose_pull.rc == 0
+  retries: 3
+  delay: 10
+  async: 1800
+  poll: 30
+  changed_when: false
+
+- name: Start the Confluent Platform stack
+  command: "docker compose -p {{ confluent_compose_project }} up -d"
+  args:
+    chdir: "{{ confluent_compose_dir }}"
+  when:
+    - confluent_start_services | bool
+    - not ansible_check_mode
+  register: compose_up
+  changed_when: compose_up.rc == 0 and (compose_file is changed or confluent_restart_containers | bool)
+
+- name: Restart the stack when configuration changed and containers were already running
+  command: "docker compose -p {{ confluent_compose_project }} restart"
+  args:
+    chdir: "{{ confluent_compose_dir }}"
+  when:
+    - confluent_start_services | bool
+    - not ansible_check_mode
+    - compose_file is changed
+    - compose_up is not changed
+  changed_when: true
+
+- name: Wait for Kafka to accept connections on the Docker host port
+  wait_for:
+    port: "{{ confluent_kafka_port_host }}"
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 10
+    timeout: 300
+  when: confluent_start_services | bool and not ansible_check_mode
+
+- name: List running Confluent containers
+  command: "docker compose -p {{ confluent_compose_project }} ps"
+  args:
+    chdir: "{{ confluent_compose_dir }}"
+  register: compose_ps
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Show Confluent containers status
+  debug:
+    msg: "{{ compose_ps.stdout_lines | default([]) }}"
+  when: not ansible_check_mode
+
+- name: Verify Schema Registry responds
+  uri:
+    url: "http://127.0.0.1:{{ confluent_schema_registry_port }}/"
+    status_code: 200
+    return_content: false
+  register: sr_health
+  retries: 12
+  delay: 10
+  until: sr_health.status == 200
+  when: confluent_start_services | bool and not ansible_check_mode
+
+- name: Verify ksqlDB responds
+  uri:
+    url: "http://127.0.0.1:{{ confluent_ksqldb_port }}/info"
+    status_code: 200
+    return_content: false
+  register: ksql_health
+  retries: 12
+  delay: 10
+  until: ksql_health.status == 200
+  when: confluent_start_services | bool and not ansible_check_mode
+
+- name: Display Confluent Platform endpoints
+  debug:
+    msg:
+      - "Kafka (external)      : {{ ansible_host | default(inventory_hostname) }}:{{ confluent_kafka_port_host }}"
+      - "Schema Registry       : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_schema_registry_port }}"
+      - "Kafka REST Proxy      : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_kafka_rest_port }}"
+      - "ksqlDB Server         : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_ksqldb_port }}"
+      - "Control Center (UI)   : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_control_center_port }} ({{ control_center_basic_user }}/{{ control_center_basic_password }})"

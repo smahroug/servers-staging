@@ -1,0 +1,13 @@
+---
+# ==============================================================================
+# Confluent Platform (Community Edition) on Docker - orchestration
+# Step 1: Docker installation (docker.yml)
+# Step 2: Confluent Platform deployment (kafka.yml)
+# ==============================================================================
+
+- name: Install and configure Docker
+  include_tasks: docker.yml
+  when: confluent_install_docker | bool
+
+- name: Deploy Confluent Platform containers
+  include_tasks: kafka.yml

@@ -1,0 +1,13 @@
+---
+- name: Deploy Confluent Platform (Community Edition) on Docker
+  hosts: confluent_kafka_servers
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - confluent-kafka
+
+  tags:
+    - confluent-kafka
+    - kafka
+    - deployment

@@ -1,0 +1,11 @@
+---
+- name: restart docker
+  systemd:
+    name: docker
+    state: restarted
+
+- name: restart confluent stack
+  command: "docker compose -p {{ confluent_compose_project }} restart"
+  args:
+    chdir: "{{ confluent_compose_dir }}"
+  when: not ansible_check_mode and (confluent_start_services | default(true))
