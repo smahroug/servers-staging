@@ -163,22 +163,68 @@ Log in to Control Center with `admin` / `admin` (staging default, see `control_c
 | `confluent_start_services` | true | Start containers after install |
 | `confluent_cluster_id` | generated | KRaft cluster id (stable across runs) |
 
-## Network Ports
+## Component URLs & Ports (application access)
 
-| Service | Port | Description |
-|---------|------|-------------|
-| Kafka (external) | 9093 | Broker listener on the Docker host — use this from the Mac/Flink |
-| Kafka (internal) | 9092 | Broker listener inside the compose network |
-| Schema Registry | 8081 | Avro/JSON schema management API |
-| Kafka Connect | 8083 | Connect distributed REST API |
-| Kafka REST | 8082 | REST proxy for Kafka |
-| ksqlDB | 8088 | ksqlDB server |
-| Control Center Next-Gen | 9021 | Web UI |
-| Prometheus | 9090 | Metrics / telemetry |
-| Alertmanager | 9095 | Alerts (container port 9093) |
+All components are reachable from the Mac, other staging VMs and applications via the
+VM host-only IP (default **`192.168.56.5`** — see the ⚠️ note below).
 
-## Connecting from the Mac / other VMs
+| Component | URL / endpoint | Port | Auth | Typical use |
+|-----------|----------------|------|------|-------------|
+| **Kafka broker** (external) | `192.168.56.5:9093` | 9093 | PLAINTEXT | `bootstrap-server` for producers/consumers, Flink, ksqldb-cli, Kafka tools |
+| **Kafka broker** (internal) | `kafka:9092` | 9092 | PLAINTEXT | Container-to-container only (compose network) — **not** reachable from outside |
+| **Schema Registry** | `http://192.168.56.5:8081` | 8081 | none | Avro/JSON schema management (`/subjects`, `/schemas/ids/{id}`) |
+| **Kafka Connect** | `http://192.168.56.5:8083` | 8083 | none | Connect REST API (`/connectors`, `/connector-plugins`) |
+| **Kafka REST Proxy** | `http://192.168.56.5:8082` | 8082 | none | Produce/consume over HTTP (`/v3/clusters`) |
+| **ksqlDB Server** | `http://192.168.56.5:8088` | 8088 | none | ksql queries (`/info`, `/query`, websocket `/query.ws`) |
+| **Control Center Next-Gen** | `http://192.168.56.5:9021` | 9021 | `admin` / `admin` | Web UI (clusters, topics, consumers, Connect, ksqlDB) |
+| **Prometheus** | `http://192.168.56.5:9090` | 9090 | none | Broker metrics, PromQL queries (`/api/v1/query`), targets |
+| **Alertmanager** | `http://192.168.56.5:9095` | 9095 | none | Alerts UI/API (container listens on 9093, host port 9095) |
 
+> ⚠️ **The VM IP can change.** The `192.168.56.x` address depends on the order VMs are
+> started (VirtualBox DHCP). If the IP changes:
+> 1. Update `ansible_host` in `inventory/hosts.yml`
+> 2. Re-run the playbook — it re-renders the compose file with the new advertised host
+>    (`confluent_advertised_host`, defaults to `ansible_host`) and restarts the stack
+>
+> Kafka clients resolve the broker through the **advertised listener** baked into the
+> compose file, so a stale IP breaks *new* client connections until the playbook re-runs.
+> Internal component traffic (C3 ↔ SR ↔ Connect ↔ ksqlDB ↔ broker) uses Docker DNS names
+> (`kafka`, `schema-registry`, ...) and is unaffected.
+
+### Client configuration examples
+
+**Kafka producer/consumer (Java, Spring, Flink, ...):**
+```properties
+bootstrap.servers=192.168.56.5:9093
+# PLAINTEXT, no auth — staging only
+```
+
+**Schema Registry (Avro serializer):**
+```properties
+schema.registry.url=http://192.168.56.5:8081
+```
+
+**Kafka Connect (REST):**
+```bash
+curl http://192.168.56.5:8083/connectors
+curl -X POST http://192.168.56.5:8083/connectors \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-connector", "config": {...}}'
+```
+
+**ksqlDB:**
+```bash
+curl -X POST http://192.168.56.5:8088/query \
+  -H "Content-Type: application/vnd.ksql.v1+json" \
+  -d '{"ksql": "SHOW TOPICS;", "streamsProperties": {}}'
+```
+
+**Kafka REST Proxy (v3):**
+```bash
+curl http://192.168.56.5:8082/v3/clusters
+```
+
+**CLI quick checks from the Mac / another VM:**
 ```bash
 # Kafka (PLAINTEXT)
 kafka-topics --bootstrap-server 192.168.56.5:9093 --list
@@ -191,9 +237,19 @@ curl http://192.168.56.5:8088/info
 
 # REST Proxy
 curl http://192.168.56.5:8082/v3/clusters
+
+# Connect
+curl http://192.168.56.5:8083/connector-plugins
 ```
 
-The external listener advertises `{{ ansible_host }}:9093` so clients resolve it correctly.
+### Ports inside the VM only (not exposed)
+
+| Service | Port | Note |
+|---------|------|------|
+| Kafka internal listener | 9092 | Compose network only |
+| KRaft controller | 9094 | Compose network only |
+| Kafka JMX | 9101 | Compose network only |
+| Alertmanager (container) | 9093 | Published on host as 9095 |
 
 ## Service Management
 
