@@ -259,5 +259,36 @@ services:
     ports:
       - "{{ confluent_control_center_port }}:{{ confluent_control_center_port }}"
 
+{% if postgres_enabled | bool %}
+  postgresql:
+    image: {{ postgres_image_repo }}/postgres:{{ postgres_version }}
+    container_name: postgresql
+    hostname: postgresql
+    restart: unless-stopped
+    ports:
+      - "{{ postgres_port }}:5432"
+    environment:
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      POSTGRES_DB: "{{ postgres_db }}"
+{% if postgres_initdb_args | length > 0 %}
+      POSTGRES_INITDB_ARGS: "{{ postgres_initdb_args }}"
+{% endif %}
+      # Keep the data cluster in a subdirectory so the named volume root can
+      # host init scripts / logs without polluting the cluster
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ postgres_user }} -d {{ postgres_db }}"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+{% endif %}
 volumes:
   ksqldb-data:
+{% if postgres_enabled | bool %}
+  postgresql-data:
+{% endif %}

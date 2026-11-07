@@ -51,7 +51,7 @@
         msg: |
           Confluent Platform has been successfully uninstalled.
           Removed:
-          - All Confluent containers and volumes (compose project {{ confluent_compose_project }})
+          - All Confluent containers and volumes (compose project {{ confluent_compose_project }}), including the PostgreSQL container and its data volume
           - Pulled confluentinc/* images
           - {{ confluent_compose_dir }}
           Docker itself: {{ 'removed' if docker_remove_packages | bool else 'kept (docker_remove_packages: false)' }}

@@ -89,6 +89,18 @@ confluent_control_center_heap: "1200M"
 control_center_basic_user: "admin"
 control_center_basic_password: "admin"
 
+# PostgreSQL (Docker) - deployed alongside the Confluent stack on the same host
+# Set postgres_enabled: false to skip it entirely.
+postgres_enabled: true
+postgres_version: "18"
+postgres_image_repo: "docker.io/library"
+postgres_port: 5432            # host port; the container always listens on 5432
+postgres_user: "postgres"
+postgres_password: "postgres"
+postgres_db: "postgres"
+# Extra arguments passed to initdb on first start (empty = image defaults)
+postgres_initdb_args: ""
+
 # Addressing note: the VM IP (192.168.56.x) can change depending on VM start
 # order. The external listener advertises ansible_host by default; override
 # confluent_advertised_host in the inventory if you reach the VM by another

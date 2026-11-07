@@ -40,6 +40,14 @@
   when: ansible_os_family == "Debian"
   failed_when: false
 
+- name: Open firewall for PostgreSQL port
+  ufw:
+    rule: allow
+    port: "{{ postgres_port }}"
+    proto: tcp
+  when: ansible_os_family == "Debian" and postgres_enabled | bool
+  failed_when: false
+
 - name: Deploy Prometheus / Alertmanager configuration for Control Center Next-Gen
   include_tasks: prometheus-config.yml
 
@@ -94,6 +102,14 @@
     timeout: 300
   when: confluent_start_services | bool and not ansible_check_mode
 
+- name: Wait for PostgreSQL to accept connections on the Docker host port
+  wait_for:
+    port: "{{ postgres_port }}"
+    host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+    delay: 5
+    timeout: 180
+  when: confluent_start_services | bool and postgres_enabled | bool and not ansible_check_mode
+
 - name: List running Confluent containers
   command: "docker compose -p {{ confluent_compose_project }} ps"
   args:
@@ -129,6 +145,17 @@
   until: ksql_health.status == 200
   when: confluent_start_services | bool and not ansible_check_mode
 
+- name: Verify PostgreSQL responds to queries
+  command: >-
+    docker exec postgresql pg_isready
+    -U {{ postgres_user }} -d {{ postgres_db }} -h 127.0.0.1 -p 5432
+  register: pg_isready
+  retries: 12
+  delay: 10
+  until: pg_isready.rc == 0
+  when: confluent_start_services | bool and postgres_enabled | bool and not ansible_check_mode
+  changed_when: false
+
 - name: Display Confluent Platform endpoints
   debug:
     msg:
@@ -137,3 +164,16 @@
       - "Kafka REST Proxy      : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_kafka_rest_port }}"
       - "ksqlDB Server         : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_ksqldb_port }}"
       - "Control Center (UI)   : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_control_center_port }} ({{ control_center_basic_user }}/{{ control_center_basic_password }})"
+      - "PostgreSQL (external) : {{ ansible_host | default(inventory_hostname) }}:{{ postgres_port }} ({{ postgres_user }}/{{ postgres_password }})"
+  when: not postgres_enabled | bool
+
+- name: Display Confluent Platform endpoints (with PostgreSQL)
+  debug:
+    msg:
+      - "Kafka (external)      : {{ ansible_host | default(inventory_hostname) }}:{{ confluent_kafka_port_host }}"
+      - "Schema Registry       : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_schema_registry_port }}"
+      - "Kafka REST Proxy      : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_kafka_rest_port }}"
+      - "ksqlDB Server         : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_ksqldb_port }}"
+      - "Control Center (UI)   : http://{{ ansible_host | default(inventory_hostname) }}:{{ confluent_control_center_port }} ({{ control_center_basic_user }}/{{ control_center_basic_password }})"
+      - "PostgreSQL (external) : {{ ansible_host | default(inventory_hostname) }}:{{ postgres_port }} ({{ postgres_user }}/{{ postgres_password }})"
+  when: postgres_enabled | bool

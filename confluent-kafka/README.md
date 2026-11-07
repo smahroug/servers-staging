@@ -17,6 +17,7 @@ The role deploys the full Confluent stack via Docker Compose:
 | kafka-ui (kafbat) | `kafbat/kafka-ui` | `kafka-ui` | 8090 |
 | Prometheus (metrics) | `confluentinc/cp-enterprise-prometheus` | `prometheus` | 9090 |
 | Alertmanager | `confluentinc/cp-enterprise-alertmanager` | `alertmanager` | 9095 (container 9093) |
+| PostgreSQL | `postgres` | `postgresql` | 5432 |
 
 Kafka runs in **KRaft mode** (no ZooKeeper) — ZooKeeper is deprecated since Confluent Platform 8.x.
 
@@ -167,6 +168,12 @@ Log in to Control Center with `admin` / `admin` (staging default, see `control_c
 | `confluent_compose_dir` | /opt/confluent-kafka | Where the compose file lives |
 | `confluent_start_services` | true | Start containers after install |
 | `confluent_cluster_id` | generated | KRaft cluster id (stable across runs) |
+| `postgres_enabled` | true | Deploy PostgreSQL in the same compose stack |
+| `postgres_version` | "18" | PostgreSQL image tag (pin the major version) |
+| `postgres_port` | 5432 | PostgreSQL port exposed on the VM (container listens on 5432) |
+| `postgres_user` / `postgres_password` | postgres / postgres | PostgreSQL superuser credentials (staging default) |
+| `postgres_db` | "postgres" | Database created on first start |
+| `postgres_initdb_args` | "" | Extra `initdb` arguments (first start only) |
 
 ## Component URLs & Ports (application access)
 
@@ -185,6 +192,7 @@ VM host-only IP (default **`192.168.56.5`** — see the ⚠️ note below).
 | **kafka-ui (kafbat)** | `http://192.168.56.5:8090` | 8090 | none | Lightweight web UI: topics/messages, consumer groups, Schema Registry, Connect, ACLs |
 | **Prometheus** | `http://192.168.56.5:9090` | 9090 | none | Broker metrics, PromQL queries (`/api/v1/query`), targets |
 | **Alertmanager** | `http://192.168.56.5:9095` | 9095 | none | Alerts UI/API (container listens on 9093, host port 9095) |
+| **PostgreSQL** | `192.168.56.5:5432` | 5432 | `postgres` / `postgres` | SQL database for applications (Flink sinks, Connect JDBC, SonarQube, ...) |
 
 > ⚠️ **The VM IP can change.** The `192.168.56.x` address depends on the order VMs are
 > started (VirtualBox DHCP). If the IP changes:
@@ -230,6 +238,15 @@ curl -X POST http://192.168.56.5:8088/query \
 curl http://192.168.56.5:8082/v3/clusters
 ```
 
+**PostgreSQL (JDBC / psql / clients):**
+```properties
+jdbc:postgresql://192.168.56.5:5432/postgres
+# user: postgres, password: postgres — staging only
+```
+```bash
+psql postgresql://postgres:postgres@192.168.56.5:5432/postgres -c "SELECT version();"
+```
+
 **CLI quick checks from the Mac / another VM:**
 ```bash
 # Kafka (PLAINTEXT)
@@ -256,6 +273,7 @@ curl http://192.168.56.5:8083/connector-plugins
 | KRaft controller | 9094 | Compose network only |
 | Kafka JMX | 9101 | Compose network only |
 | Alertmanager (container) | 9093 | Published on host as 9095 |
+| PostgreSQL (container) | 5432 | Published on host as 5432 |
 
 ## Service Management
 
@@ -270,6 +288,10 @@ docker compose -p confluent down -v   # removes data
 # Logs
 docker compose -p confluent logs -f kafka
 docker logs kafka 2>&1 | tail -50
+
+# PostgreSQL
+docker compose -p confluent logs -f postgresql
+docker exec -it postgresql psql -U postgres
 ```
 
 ## Uninstallation
@@ -290,6 +312,7 @@ Removes the compose stack (containers + volumes), `/opt/confluent-kafka` and the
   Set `confluent_authorizer_enabled: false` to disable it.
 - Default listeners are **PLAINTEXT** — staging only. For production add SASL/SSL listeners and credentials
 - Default Control Center login `admin/admin` — override `control_center_basic_user` / `control_center_basic_password`
+- Default PostgreSQL login `postgres/postgres` — override `postgres_password` (and consider `postgres_initdb_args` for locale/encoding); the superuser is exposed on 5432, restrict it with ufw rules if needed
 - Use SSH keys + ansible-vault instead of plain passwords in the inventory
 
 ## Troubleshooting
@@ -298,6 +321,7 @@ Removes the compose stack (containers + volumes), `/opt/confluent-kafka` and the
 2. **Kafka not reachable on 9093**: check `docker compose -p confluent ps` and `docker logs kafka`
 3. **Control Center slow/OOM**: increase `confluent_control_center_heap` or VM RAM
 4. **ARM64 (Apple Silicon host)**: all `cp-*` images used here are multi-arch (amd64 + arm64)
+5. **PostgreSQL data lost after re-install**: the data lives in the `confluent_postgresql-data` volume; `docker compose -p confluent down -v` deletes it. Credentials are only applied on **first** start — to change them later, alter the role with SQL or recreate the volume.
 
 ## Support
 
