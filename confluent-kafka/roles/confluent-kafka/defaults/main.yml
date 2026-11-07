@@ -35,6 +35,12 @@ confluent_kafka_heap: "1G"
 confluent_kafka_port_internal: 9092   # listener inside the compose network
 confluent_kafka_port_host: 9093       # listener exposed on the Docker host (Mac/Flink access)
 confluent_kafka_controller_port: 9094 # KRaft controller (internal)
+# Extra external listener published on host port 9092. It binds a different port
+# inside the container (cannot reuse 9092, already used by the internal listener)
+# and advertises the VM IP so host clients connecting to :9092 work.
+confluent_kafka_port_host_9092: 9092         # host port for the extra external listener
+confluent_kafka_port_container_9092: 19092   # container-side bind for that listener
+confluent_kafka_listener_name_9092: "PLAINTEXT_HOST9092"
 confluent_kafka_auto_create_topics: "true"
 confluent_kafka_default_replication: 1
 confluent_kafka_offsets_replication: 1

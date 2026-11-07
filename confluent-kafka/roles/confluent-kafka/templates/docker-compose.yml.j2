@@ -10,15 +10,16 @@ services:
     restart: unless-stopped
     ports:
       - "{{ confluent_kafka_port_host }}:{{ confluent_kafka_port_host }}"
+      - "{{ confluent_kafka_port_host_9092 }}:{{ confluent_kafka_port_container_9092 }}"
     environment:
       KAFKA_NODE_ID: "{{ confluent_kafka_node_id }}"
       CLUSTER_ID: "{{ confluent_cluster_id }}"
       KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "{{ confluent_kafka_node_id }}@kafka:{{ confluent_kafka_controller_port }}"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:{{ confluent_kafka_port_internal }},CONTROLLER://0.0.0.0:{{ confluent_kafka_controller_port }},PLAINTEXT_HOST://0.0.0.0:{{ confluent_kafka_port_host }}"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:{{ confluent_kafka_port_internal }},PLAINTEXT_HOST://{{ confluent_advertised_host }}:{{ confluent_kafka_port_host }}"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:{{ confluent_kafka_port_internal }},CONTROLLER://0.0.0.0:{{ confluent_kafka_controller_port }},PLAINTEXT_HOST://0.0.0.0:{{ confluent_kafka_port_host }},{{ confluent_kafka_listener_name_9092 }}://0.0.0.0:{{ confluent_kafka_port_container_9092 }}"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:{{ confluent_kafka_port_internal }},PLAINTEXT_HOST://{{ confluent_advertised_host }}:{{ confluent_kafka_port_host }},{{ confluent_kafka_listener_name_9092 }}://{{ confluent_advertised_host }}:{{ confluent_kafka_port_host_9092 }}"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,{{ confluent_kafka_listener_name_9092 }}:PLAINTEXT"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "{{ confluent_kafka_offsets_replication }}"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "{{ confluent_kafka_transaction_replication }}"
