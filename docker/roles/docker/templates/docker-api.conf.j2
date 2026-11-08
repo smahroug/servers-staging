@@ -1,0 +1,4 @@
+# Managed by Ansible — overrides ExecStart to expose the Docker API over TCP
+[Service]
+ExecStart=
+ExecStart=/usr/bin/dockerd{% for h in docker_api_hosts %} -H {{ h }}{% endfor %} --containerd=/run/containerd/containerd.sock

@@ -74,6 +74,50 @@
     mode: '0644'
   notify: restart docker
 
+- name: Create Docker systemd drop-in directory
+  file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: '0755'
+
+- name: Configure Docker API listeners (systemd drop-in)
+  template:
+    src: docker-api.conf.j2
+    dest: /etc/systemd/system/docker.service.d/docker-api.conf
+    mode: '0644'
+  notify: restart docker
+  when: docker_api_hosts | length > 0
+
+- name: Remove Docker API systemd drop-in when disabled
+  file:
+    path: /etc/systemd/system/docker.service.d/docker-api.conf
+    state: absent
+  notify: restart docker
+  when: docker_api_hosts | length == 0
+
+- name: Install ufw
+  apt:
+    name: ufw
+    state: present
+  when: docker_api_firewall_sources | length > 0 or docker_firewall_allow_ports | length > 0
+
+- name: Allow Docker API in ufw
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "2375"
+    proto: tcp
+    comment: Docker remote API
+  loop: "{{ docker_api_firewall_sources }}"
+  when: docker_api_hosts | select('search', 'tcp://') | list | length > 0
+
+- name: Allow published container ports in ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] if '/' in item else 'tcp' }}"
+  loop: "{{ docker_firewall_allow_ports }}"
+
 - name: Ensure docker group exists
   group:
     name: docker
@@ -102,3 +146,12 @@
 - name: Display Docker version
   debug:
     msg: "Docker installed: {{ docker_version.stdout }}"
+
+- name: Verify Docker API is listening
+  command: ss -tln
+  register: docker_listeners
+  changed_when: false
+
+- name: Display Docker API listeners
+  debug:
+    msg: "{{ docker_listeners.stdout_lines | select('search', ':2375') | list | default(['TCP API not enabled']) }}"

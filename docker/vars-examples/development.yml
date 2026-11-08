@@ -5,3 +5,16 @@ docker_users:
 docker_log_driver: "json-file"
 docker_log_max_size: "10m"
 docker_log_max_file: "3"
+
+# Expose the Docker API on TCP 2375 (unauthenticated — lab/dev only)
+docker_api_hosts:
+  - "unix:///var/run/docker.sock"
+  - "tcp://0.0.0.0:2375"
+
+# Restrict API access to the VirtualBox host-only network
+docker_api_firewall_sources:
+  - "192.168.56.0/24"
+
+# Published container ports to allow through the firewall
+docker_firewall_allow_ports:
+  - 5432/tcp

@@ -96,6 +96,38 @@ docker/
 | `docker_log_max_size` | "10m" | Max size of a container log file |
 | `docker_log_max_file` | "3" | Number of rotated log files |
 | `docker_extra_config` | "" | Extra raw JSON merged into daemon.json |
+| `docker_api_hosts` | [] | Daemon `-H` listeners (e.g. `tcp://0.0.0.0:2375`); empty = unix socket only |
+| `docker_api_firewall_sources` | [] | ufw source CIDRs allowed to reach the Docker API |
+| `docker_firewall_allow_ports` | [] | Extra ufw allowances for published container ports (e.g. `5432/tcp`) |
+
+### Remote Docker API access
+
+By default the daemon only listens on the local unix socket. To use the API from
+another machine (e.g. your host against a VirtualBox VM), enable a TCP listener:
+
+```yaml
+docker_api_hosts:
+  - "unix:///var/run/docker.sock"
+  - "tcp://0.0.0.0:2375"
+docker_api_firewall_sources:
+  - "192.168.56.0/24"   # restrict to trusted networks
+```
+
+The role installs a systemd drop-in (`/etc/systemd/system/docker.service.d/docker-api.conf`)
+that overrides `ExecStart` with the configured `-H` flags, and opens port 2375 in
+ufw **only** for the listed source CIDRs.
+
+> **Warning:** port 2375 is unauthenticated and unencrypted — anyone who can reach it has
+> root-equivalent control over the host. Only use it on trusted/isolated networks
+> (lab VMs, host-only adapters). For anything shared, use 2376 with TLS
+> (`dockerd --tlsverify` + CA/client certs) instead.
+
+Verify from your machine:
+
+```bash
+nc -vz 192.168.56.10 2375
+curl http://192.168.56.10:2375/version
+```
 
 ### Customization
 

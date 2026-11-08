@@ -15,3 +15,17 @@ docker_log_max_file: "3"
 
 # Extra raw JSON appended to daemon.json (must include leading comma, e.g. ", \"registry-mirrors\": [...]")
 docker_extra_config: ""
+
+# Remote API exposure. Empty list = unix socket only (systemd default).
+# WARNING: TCP 2375 is unauthenticated/unencrypted — restrict with docker_api_firewall_sources.
+docker_api_hosts: []
+#  - "unix:///var/run/docker.sock"
+#  - "tcp://0.0.0.0:2375"
+
+# Firewall (ufw) rules for the Docker API. Empty = no rule added.
+docker_api_firewall_sources: []
+#  - "192.168.56.0/24"
+
+# Ports to allow in ufw (e.g. published container ports like PostgreSQL 5432)
+docker_firewall_allow_ports: []
+#  - 5432/tcp
