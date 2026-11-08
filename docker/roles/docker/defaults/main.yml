@@ -1,0 +1,17 @@
+---
+# Docker version and repository settings
+docker_repo_url: "https://download.docker.com/linux/ubuntu"
+docker_gpg_key_url: "https://download.docker.com/linux/ubuntu/gpg"
+docker_apt_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
+# Users to add to the docker group
+docker_users:
+  - user
+
+# Logging configuration
+docker_log_driver: "json-file"
+docker_log_max_size: "10m"
+docker_log_max_file: "3"
+
+# Extra raw JSON appended to daemon.json (must include leading comma, e.g. ", \"registry-mirrors\": [...]")
+docker_extra_config: ""

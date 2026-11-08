@@ -1,0 +1,84 @@
+---
+- name: Uninstall Docker
+  hosts: docker_servers
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Stop Docker service
+      systemd:
+        name: docker
+        state: stopped
+      ignore_errors: yes
+
+    - name: Stop containerd service
+      systemd:
+        name: containerd
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable Docker service
+      systemd:
+        name: docker
+        enabled: no
+      ignore_errors: yes
+
+    - name: Disable containerd service
+      systemd:
+        name: containerd
+        enabled: no
+      ignore_errors: yes
+
+    - name: Remove Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+          - docker-ce-rootless-extras
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove Docker APT repository
+      apt_repository:
+        repo: >-
+          deb [arch={{ docker_apt_arch | default('amd64') }} signed-by=/etc/apt/keyrings/docker.asc]
+          {{ docker_repo_url | default('https://download.docker.com/linux/ubuntu') }} {{ ansible_distribution_release | default('focal') }} stable
+        filename: docker
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove Docker GPG key
+      file:
+        path: /etc/apt/keyrings/docker.asc
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove Docker configuration directory
+      file:
+        path: /etc/docker
+        state: absent
+
+    - name: Remove Docker data directory (⚠️ destroys images, containers and volumes)
+      file:
+        path: /var/lib/docker
+        state: absent
+
+    - name: Remove containerd data directory (⚠️ destroys containerd data)
+      file:
+        path: /var/lib/containerd
+        state: absent
+
+    - name: Display uninstallation summary
+      debug:
+        msg: |
+          Docker has been successfully uninstalled.
+          Removed:
+          - docker and containerd services
+          - Docker Engine, CLI, buildx and compose plugins
+          - Docker APT repository and GPG key
+          - /etc/docker (configuration)
+          - /var/lib/docker (images, containers, volumes)
+          - /var/lib/containerd

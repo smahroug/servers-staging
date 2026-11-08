@@ -1,0 +1,12 @@
+---
+# Environment-specific variables can be overridden here
+# These variables have higher precedence than defaults
+
+# Example: different users for docker group
+# docker_users:
+#   - user
+#   - deploy
+
+# Example: larger log rotation
+# docker_log_max_size: "50m"
+# docker_log_max_file: "5"

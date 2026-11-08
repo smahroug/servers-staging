@@ -1,0 +1,12 @@
+---
+- name: Install Docker
+  hosts: docker_servers
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - docker
+
+  tags:
+    - docker
+    - deployment
