@@ -1,0 +1,17 @@
+---
+# PostgreSQL container settings
+postgres_image: "postgres:17"
+postgres_container_name: "postgres"
+postgres_port: 5432
+postgres_bind_address: "0.0.0.0"
+
+# Database credentials
+postgres_db: "appdb"
+postgres_user: "postgres"
+postgres_password: "postgres"
+
+# Data persistence
+postgres_data_dir: "/opt/postgres/data"
+
+# Restart policy
+postgres_restart_policy: "unless-stopped"

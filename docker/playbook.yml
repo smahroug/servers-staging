@@ -6,6 +6,7 @@
 
   roles:
     - docker
+    - postgres
 
   tags:
     - docker

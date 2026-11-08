@@ -113,9 +113,40 @@ To add extra daemon options (registry mirrors, insecure registries, ...), use `d
 docker_extra_config: ', "registry-mirrors": ["https://mirror.example.com"], "insecure-registries": ["192.168.56.10:5000"]'
 ```
 
+## PostgreSQL
+
+The playbook also deploys a PostgreSQL container (role `postgres`) that is published on all host interfaces, so it is reachable from your machine at `192.168.56.10:5432`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `postgres_image` | "postgres:17" | Container image |
+| `postgres_container_name` | "postgres" | Container name |
+| `postgres_port` | 5432 | Host port to publish |
+| `postgres_bind_address` | "0.0.0.0" | Address to bind the published port |
+| `postgres_db` | "appdb" | Database created on first start |
+| `postgres_user` | "postgres" | Superuser name |
+| `postgres_password` | "postgres" | Superuser password |
+| `postgres_data_dir` | "/opt/postgres/data" | Host directory for data persistence |
+| `postgres_restart_policy` | "unless-stopped" | Container restart policy |
+
+Override credentials/ports the same way as Docker variables:
+
+```bash
+ansible-playbook -i inventory/hosts.yml playbook.yml \
+  -e 'postgres_password=secret' -e postgres_port=5433
+```
+
+Connect from your machine (e.g. with `psql`):
+
+```bash
+psql -h 192.168.56.10 -p 5432 -U postgres -d appdb
+```
+
+Data survives container restarts and reboots via the bind mount at `/opt/postgres/data`.
+
 ## Network Ports
 
-No ports are opened by Docker itself. Published container ports (`-p` / `ports:`) should be opened in the firewall as needed.
+The PostgreSQL container publishes port **5432** on all host interfaces (`0.0.0.0:5432 -> 5432`). Other published container ports (`-p` / `ports:`) should be opened in the firewall as needed.
 
 ## Service Management
 

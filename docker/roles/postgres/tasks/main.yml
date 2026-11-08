@@ -1,0 +1,54 @@
+---
+# PostgreSQL container deployment tasks
+
+- name: Create PostgreSQL data directory
+  file:
+    path: "{{ postgres_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Run PostgreSQL container
+  community.docker.docker_container:
+    name: "{{ postgres_container_name }}"
+    image: "{{ postgres_image }}"
+    state: started
+    restart_policy: "{{ postgres_restart_policy }}"
+    ports:
+      - "{{ postgres_bind_address }}:{{ postgres_port }}:5432"
+    env:
+      POSTGRES_DB: "{{ postgres_db }}"
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - "{{ postgres_data_dir }}:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ postgres_user }} -d {{ postgres_db }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    log_options:
+      max-size: "{{ docker_log_max_size | default('10m') }}"
+      max-file: "{{ docker_log_max_file | default('3') }}"
+    log_driver: "{{ docker_log_driver | default('json-file') }}"
+
+- name: Wait for PostgreSQL to be ready
+  community.docker.docker_container_exec:
+    container: "{{ postgres_container_name }}"
+    command: pg_isready -U {{ postgres_user }} -d {{ postgres_db }}
+  register: pg_ready
+  retries: 30
+  delay: 2
+  until: pg_ready.rc == 0
+
+- name: Check PostgreSQL container status
+  command: docker ps --filter "name={{ postgres_container_name }}" --format "{{ '{{' }}.Status{{ '}}' }}"
+  register: postgres_status
+  changed_when: false
+
+- name: Display PostgreSQL status
+  debug:
+    msg: "PostgreSQL running: {{ postgres_status.stdout }} — reachable at {{ postgres_bind_address }}:{{ postgres_port }} (db: {{ postgres_db }}, user: {{ postgres_user }})"
