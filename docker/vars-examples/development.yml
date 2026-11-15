@@ -18,3 +18,5 @@ docker_api_firewall_sources:
 # Published container ports to allow through the firewall
 docker_firewall_allow_ports:
   - 5432/tcp
+  - 8080/tcp   # Papercut SMTP web console
+  - 2525/tcp   # Papercut SMTP listener

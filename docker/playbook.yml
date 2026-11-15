@@ -7,6 +7,7 @@
   roles:
     - docker
     - postgres
+    - papercut_smtp
 
   tags:
     - docker

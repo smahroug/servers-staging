@@ -1,0 +1,6 @@
+---
+- name: restart papercut_smtp
+  community.docker.docker_container:
+    name: "{{ papercut_smtp_container_name }}"
+    state: started
+    restart: true

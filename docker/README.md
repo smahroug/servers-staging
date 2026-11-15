@@ -176,9 +176,150 @@ psql -h 192.168.56.10 -p 5432 -U postgres -d appdb
 
 Data survives container restarts and reboots via the bind mount at `/opt/postgres/data`.
 
+## Papercut SMTP
+
+The playbook also deploys a [Papercut SMTP](https://www.papercut-smtp.com/) container (role `papercut_smtp`) — a development SMTP server that catches outgoing emails and displays them in a web console, never delivering them anywhere. The console is published on all host interfaces, so it is reachable from your machine at `http://192.168.56.10:8080`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `papercut_smtp_image` | "changemakerstudiosus/papercut-smtp:latest" | Container image |
+| `papercut_smtp_container_name` | "papercut-smtp" | Container name |
+| `papercut_smtp_console_port` | 8080 | Host port for the web console |
+| `papercut_smtp_smtp_port` | 2525 | Host port for the SMTP listener |
+| `papercut_smtp_bind_address` | "0.0.0.0" | Address to bind the published ports |
+| `papercut_smtp_restart_policy` | "unless-stopped" | Container restart policy |
+
+Point your application's SMTP settings at `192.168.56.10:2525` and open the console at:
+
+```
+http://192.168.56.10:8080
+```
+
+Override ports the same way as Docker variables:
+
+```bash
+ansible-playbook -i inventory/hosts.yml playbook.yml \
+  -e papercut_smtp_console_port=8081 -e papercut_smtp_smtp_port=2526
+```
+
+### Using Papercut SMTP from your applications
+
+Papercut is a **catch-all dev SMTP server**: any email your app sends to it is captured and shown in the web console — it is **never delivered** to real recipients. That makes it safe to use with any from/to addresses, including fake ones.
+
+**Connection settings** (no authentication, no TLS — plain SMTP):
+
+| Setting | Value |
+|---------|-------|
+| Host | `192.168.56.10` (the docker server) |
+| Port | `2525` |
+| Username | *(empty — no auth required)* |
+| Password | *(empty — no auth required)* |
+| Encryption / SSL | None / plain SMTP (do **not** enable SSL or STARTTLS) |
+| From / To addresses | Anything — emails are never delivered |
+
+**Environment variables** (the most common way to wire it up):
+
+```bash
+SMTP_HOST=192.168.56.10
+SMTP_PORT=2525
+SMTP_USER=            # leave empty
+SMTP_PASSWORD=        # leave empty
+SMTP_TLS=none         # or SMTP_SECURE=false, depending on your framework
+```
+
+**Spring Boot** (`application.yml`):
+
+```yaml
+spring:
+  mail:
+    host: 192.168.56.10
+    port: 2525
+    username:        # not needed
+    password:        # not needed
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+```
+
+**Node.js (Nodemailer):**
+
+```js
+const transporter = nodemailer.createTransport({
+  host: "192.168.56.10",
+  port: 2525,
+  secure: false,      // no TLS
+  // no auth needed
+});
+```
+
+**Python (smtplib):**
+
+```python
+import smtplib
+from email.message import EmailMessage
+
+msg = EmailMessage()
+msg["From"] = "dev@example.com"
+msg["To"] = "test@example.com"
+msg["Subject"] = "Hello Papercut"
+msg.set_content("Test email")
+
+with smtplib.SMTP("192.168.56.10", 2525) as smtp:
+    smtp.send_message(msg)
+```
+
+**.NET (`appsettings.json`):**
+
+```json
+{
+  "Smtp": {
+    "Host": "192.168.56.10",
+    "Port": 2525,
+    "Username": "",
+    "Password": ""
+  }
+}
+```
+
+**PHP (php.ini / Symfony Mailer / Laravel):**
+
+```ini
+SMTP = 192.168.56.10
+smtp_port = 2525
+sendmail_from = dev@example.com
+```
+
+```yaml
+# Laravel .env
+MAIL_MAILER=smtp
+MAIL_HOST=192.168.56.10
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+```
+
+**Quick manual test** from your machine:
+
+```bash
+printf 'EHLO test\r\nMAIL FROM:<dev@example.com>\r\nRCPT TO:<you@example.com>\r\nDATA\r\nSubject: Test\r\n\r\nHello!\r\n.\r\nQUIT\r\n' \
+  | nc -w 5 192.168.56.10 2525
+```
+
+Then open the console at `http://192.168.56.10:8080` — the message appears instantly. The console also exposes a JSON API for automated checks:
+
+```bash
+curl http://192.168.56.10:8080/api/messages
+```
+
+> **Note:** Papercut is for development only. Emails are stored in the container's memory/disk and never relayed anywhere — do not use it as a production mail server.
+
 ## Network Ports
 
-The PostgreSQL container publishes port **5432** on all host interfaces (`0.0.0.0:5432 -> 5432`). Other published container ports (`-p` / `ports:`) should be opened in the firewall as needed.
+The PostgreSQL container publishes port **5432** on all host interfaces (`0.0.0.0:5432 -> 5432`). The Papercut SMTP container publishes **8080** (web console) and **2525** (SMTP) on all host interfaces. Other published container ports (`-p` / `ports:`) should be opened in the firewall as needed.
 
 ## Service Management
 

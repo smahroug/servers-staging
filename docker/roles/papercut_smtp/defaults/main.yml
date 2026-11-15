@@ -1,0 +1,12 @@
+---
+# Papercut SMTP container settings
+papercut_smtp_image: "changemakerstudiosus/papercut-smtp:latest"
+papercut_smtp_container_name: "papercut-smtp"
+
+# Ports published on the host
+papercut_smtp_console_port: 8080   # Web console
+papercut_smtp_smtp_port: 2525      # SMTP listener
+papercut_smtp_bind_address: "0.0.0.0"
+
+# Restart policy
+papercut_smtp_restart_policy: "unless-stopped"

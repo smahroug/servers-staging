@@ -1,0 +1,38 @@
+---
+# Papercut SMTP container deployment tasks
+
+- name: Run Papercut SMTP container
+  community.docker.docker_container:
+    name: "{{ papercut_smtp_container_name }}"
+    image: "{{ papercut_smtp_image }}"
+    state: started
+    restart_policy: "{{ papercut_smtp_restart_policy }}"
+    ports:
+      - "{{ papercut_smtp_bind_address }}:{{ papercut_smtp_console_port }}:8080"
+      - "{{ papercut_smtp_bind_address }}:{{ papercut_smtp_smtp_port }}:2525"
+    log_options:
+      max-size: "{{ docker_log_max_size | default('10m') }}"
+      max-file: "{{ docker_log_max_file | default('3') }}"
+    log_driver: "{{ docker_log_driver | default('json-file') }}"
+  notify: restart papercut_smtp
+
+- name: Wait for Papercut SMTP web console to answer
+  uri:
+    url: "http://127.0.0.1:{{ papercut_smtp_console_port }}/"
+    status_code: 200
+  register: papercut_console
+  retries: 30
+  delay: 2
+  until: papercut_console.status == 200
+
+- name: Check Papercut SMTP container status
+  command: docker ps --filter "name={{ papercut_smtp_container_name }}" --format "{{ '{{' }}.Status{{ '}}' }}"
+  register: papercut_status
+  changed_when: false
+
+- name: Display Papercut SMTP status
+  debug:
+    msg: >-
+      Papercut SMTP running: {{ papercut_status.stdout }} —
+      console at http://{{ papercut_smtp_bind_address }}:{{ papercut_smtp_console_port }},
+      SMTP at {{ papercut_smtp_bind_address }}:{{ papercut_smtp_smtp_port }}
