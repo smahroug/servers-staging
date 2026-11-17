@@ -19,6 +19,24 @@ The role deploys the full Confluent stack via Docker Compose:
 | Alertmanager | `confluentinc/cp-enterprise-alertmanager` | `alertmanager` | 9095 (container 9093) |
 | PostgreSQL | `postgres` | `postgresql` | 5432 |
 
+### JMX metrics (remote, no auth — staging only)
+
+Every Java component exposes JMX on its own port, starting at **8787**. The broker and
+the KRaft controller run in the **same JVM** (combined mode), so they share one port.
+
+| Component | JMX port |
+|-----------|----------|
+| Kafka broker + KRaft controller (single JVM) | 8787 |
+| Schema Registry | 8788 |
+| Kafka Connect | 8789 |
+| Kafka REST Proxy | 8790 |
+| ksqlDB Server | 8791 |
+| Control Center Next-Gen | 8792 |
+
+JMX is unauthenticated and non-SSL (staging). The RMI stub hostname is set to the VM IP
+(`confluent_jmx_hostname`, defaults to `confluent_advertised_host`) so tools like
+JConsole/VisualVM can connect from the Mac: `service:jmx:rmi:///jndi/rmi://192.168.56.5:8787/jmxrmi`.
+
 Kafka runs in **KRaft mode** (no ZooKeeper) — ZooKeeper is deprecated since Confluent Platform 8.x.
 
 > **Control Center Next-Gen** is the UI shipped with Confluent Platform 8.x (the legacy
@@ -149,6 +167,13 @@ Log in to Control Center with `admin` / `admin` (staging default, see `control_c
 | `confluent_install_docker` | true | Install Docker if missing |
 | `confluent_kafka_port_internal` | 9092 | Kafka listener inside the Docker network |
 | `confluent_kafka_port_host` | 9093 | Kafka listener exposed on the VM (Docker host) |
+| `confluent_jmx_port_kafka` | 8787 | JMX — Kafka broker + KRaft controller (single JVM) |
+| `confluent_jmx_port_schema_registry` | 8788 | JMX — Schema Registry |
+| `confluent_jmx_port_connect` | 8789 | JMX — Kafka Connect |
+| `confluent_jmx_port_kafka_rest` | 8790 | JMX — Kafka REST Proxy |
+| `confluent_jmx_port_ksqldb` | 8791 | JMX — ksqlDB Server |
+| `confluent_jmx_port_control_center` | 8792 | JMX — Control Center Next-Gen |
+| `confluent_jmx_hostname` | `confluent_advertised_host` | Hostname embedded in the JMX RMI stub (set to the VM IP for remote access) |
 | `confluent_schema_registry_port` | 8081 | Schema Registry |
 | `confluent_kafka_rest_port` | 8082 | Kafka REST Proxy |
 | `confluent_connect_enabled` | true | Deploy Kafka Connect |
@@ -270,8 +295,7 @@ curl http://192.168.56.5:8083/connector-plugins
 | Service | Port | Note |
 |---------|------|------|
 | Kafka internal listener | 9092 | Compose network only |
-| KRaft controller | 9094 | Compose network only |
-| Kafka JMX | 9101 | Compose network only |
+| KRaft controller | 9094 | Compose network only (shares the broker JVM — JMX on 8787 covers it) |
 | Alertmanager (container) | 9093 | Published on host as 9095 |
 | PostgreSQL (container) | 5432 | Published on host as 5432 |
 

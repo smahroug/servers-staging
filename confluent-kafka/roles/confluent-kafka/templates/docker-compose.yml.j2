@@ -11,6 +11,7 @@ services:
     ports:
       - "{{ confluent_kafka_port_host }}:{{ confluent_kafka_port_host }}"
       - "{{ confluent_kafka_port_host_9092 }}:{{ confluent_kafka_port_container_9092 }}"
+      - "{{ confluent_jmx_port_kafka }}:{{ confluent_jmx_port_kafka }}"
     environment:
       KAFKA_NODE_ID: "{{ confluent_kafka_node_id }}"
       CLUSTER_ID: "{{ confluent_cluster_id }}"
@@ -27,8 +28,8 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: "{{ confluent_kafka_default_replication }}"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "{{ confluent_kafka_auto_create_topics }}"
       KAFKA_LOG_RETENTION_HOURS: "{{ confluent_kafka_log_retention_hours }}"
-      KAFKA_JMX_PORT: "9101"
-      KAFKA_JMX_HOSTNAME: "kafka"
+      KAFKA_JMX_PORT: "{{ confluent_jmx_port_kafka }}"
+      KAFKA_JMX_HOSTNAME: "{{ confluent_jmx_hostname }}"
       KAFKA_HEAP_OPTS: "-Xmx{{ confluent_kafka_heap }} -Xms{{ confluent_kafka_heap }}"
 {% if confluent_authorizer_enabled | bool %}
       KAFKA_AUTHORIZER_CLASS_NAME: "{{ confluent_authorizer_class }}"
@@ -76,11 +77,16 @@ services:
         condition: service_healthy
     ports:
       - "{{ confluent_schema_registry_port }}:{{ confluent_schema_registry_port }}"
+      - "{{ confluent_jmx_port_schema_registry }}:{{ confluent_jmx_port_schema_registry }}"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:{{ confluent_kafka_port_internal }}"
       SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:{{ confluent_schema_registry_port }}"
       SCHEMA_REGISTRY_HEAP_OPTS: "-Xmx{{ confluent_schema_registry_heap }} -Xms{{ confluent_schema_registry_heap }}"
+      # Remote JMX without auth (staging). The image's launch script only enables
+      # remote JMX when SCHEMA_REGISTRY_JMX_REMOTE_ENABLE=true (it then forces
+      # authentication), so we set the opts directly instead.
+      SCHEMA_REGISTRY_JMX_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port={{ confluent_jmx_port_schema_registry }} -Dcom.sun.management.jmxremote.rmi.port={{ confluent_jmx_port_schema_registry }} -Djava.rmi.server.hostname={{ confluent_jmx_hostname }}"
     healthcheck:
       # cp-schema-registry 8.x images ship neither curl nor cub; probe with java
       test: ["CMD-SHELL", "java -cp /usr/share/java/confluent-common-secure/*.jar:/usr/share/java/confluent-common/*.jar io.confluent.common.security.tools.HttpProbe http://localhost:{{ confluent_schema_registry_port }} 2>/dev/null || (exec 3<>/dev/tcp/localhost/{{ confluent_schema_registry_port }}) || exit 1"]
@@ -122,6 +128,7 @@ services:
         condition: service_healthy
     ports:
       - "{{ confluent_connect_port }}:{{ confluent_connect_port }}"
+      - "{{ confluent_jmx_port_connect }}:{{ confluent_jmx_port_connect }}"
     environment:
       CONNECT_BOOTSTRAP_SERVERS: "kafka:{{ confluent_kafka_port_internal }}"
       CONNECT_REST_ADVERTISED_HOST_NAME: "connect"
@@ -145,6 +152,9 @@ services:
       # Control Center monitoring interceptors
       CONNECT_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
       CONNECT_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+      # Connect launch script honors KAFKA_JMX_PORT/KAFKA_JMX_HOSTNAME
+      KAFKA_JMX_PORT: "{{ confluent_jmx_port_connect }}"
+      KAFKA_JMX_HOSTNAME: "{{ confluent_jmx_hostname }}"
     healthcheck:
       # cp-kafka-connect 8.x images ship no curl; probe with bash /dev/tcp
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/{{ confluent_connect_port }} || exit 1"]
@@ -164,11 +174,15 @@ services:
         condition: service_healthy
     ports:
       - "{{ confluent_kafka_rest_port }}:{{ confluent_kafka_rest_port }}"
+      - "{{ confluent_jmx_port_kafka_rest }}:{{ confluent_jmx_port_kafka_rest }}"
     environment:
       KAFKA_REST_HOST_NAME: "kafka-rest"
       KAFKA_REST_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:{{ confluent_kafka_port_internal }}"
       KAFKA_REST_LISTENERS: "http://0.0.0.0:{{ confluent_kafka_rest_port }}"
       KAFKA_REST_SCHEMA_REGISTRY_URL: "http://schema-registry:{{ confluent_schema_registry_port }}"
+      # REST Proxy launch script honors KAFKAREST_JMX_PORT/KAFKA_REST_JMX_HOSTNAME
+      KAFKAREST_JMX_PORT: "{{ confluent_jmx_port_kafka_rest }}"
+      KAFKA_REST_JMX_HOSTNAME: "{{ confluent_jmx_hostname }}"
 
   ksqldb-server:
     image: {{ confluent_image_repo_prefix }}/cp-ksqldb-server:{{ confluent_version }}
@@ -182,6 +196,7 @@ services:
         condition: service_started
     ports:
       - "{{ confluent_ksqldb_port }}:{{ confluent_ksqldb_port }}"
+      - "{{ confluent_jmx_port_ksqldb }}:{{ confluent_jmx_port_ksqldb }}"
     environment:
       KSQL_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:{{ confluent_kafka_port_internal }}"
       KSQL_HOST_NAME: "ksqldb-server"
@@ -190,6 +205,10 @@ services:
       KSQL_KSQL_SERVICE_ID: "staging_ksql_"
       KSQL_KSQL_STREAMS_STATE_DIR: "/var/lib/ksql"
       KSQL_HEAP_OPTS: "-Xmx{{ confluent_ksqldb_heap }} -Xms{{ confluent_ksqldb_heap }}"
+      # ksqlDB binds JMX to loopback unless KSQL_JMX_OPTS is set — enable remote
+      KSQL_JMX_PORT: "{{ confluent_jmx_port_ksqldb }}"
+      KSQL_JMX_HOSTNAME: "{{ confluent_jmx_hostname }}"
+      KSQL_JMX_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.host=0.0.0.0 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port={{ confluent_jmx_port_ksqldb }} -Dcom.sun.management.jmxremote.rmi.port={{ confluent_jmx_port_ksqldb }} -Djava.rmi.server.hostname={{ confluent_jmx_hostname }}"
     # ksqlDB refuses to start if the state dir is not writable by the appuser it
     # runs as (uid 1000); the named volume alone is root-owned on first use.
     user: "appuser"
@@ -257,8 +276,12 @@ services:
       CONTROL_CENTER_ALERTMANAGER_URL: "http://alertmanager:9093"
       CONTROL_CENTER_ALERTMANAGER_CONFIG_FILE: "/mnt/config/alertmanager-generated.yml"
       PORT: "{{ confluent_control_center_port }}"
+      # control-center-run-class appends the port from JMX_PORT
+      JMX_PORT: "{{ confluent_jmx_port_control_center }}"
+      CONTROL_CENTER_JMX_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port={{ confluent_jmx_port_control_center }} -Dcom.sun.management.jmxremote.rmi.port={{ confluent_jmx_port_control_center }} -Djava.rmi.server.hostname={{ confluent_jmx_hostname }}"
     ports:
       - "{{ confluent_control_center_port }}:{{ confluent_control_center_port }}"
+      - "{{ confluent_jmx_port_control_center }}:{{ confluent_jmx_port_control_center }}"
 
 {% if postgres_enabled | bool %}
   postgresql:

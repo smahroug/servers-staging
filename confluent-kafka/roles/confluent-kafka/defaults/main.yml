@@ -47,6 +47,19 @@ confluent_kafka_offsets_replication: 1
 confluent_kafka_transaction_replication: 1
 confluent_kafka_log_retention_hours: 168
 
+# JMX metrics exposure (remote, no auth — staging only)
+# One port per Java component, starting at 8787. The broker and the KRaft
+# controller run in the same JVM (combined mode), so they share one port.
+confluent_jmx_port_kafka: 8787            # broker + KRaft controller (single JVM)
+confluent_jmx_port_schema_registry: 8788
+confluent_jmx_port_connect: 8789
+confluent_jmx_port_kafka_rest: 8790
+confluent_jmx_port_ksqldb: 8791
+confluent_jmx_port_control_center: 8792
+# Hostname embedded in the JMX RMI stub. Set to the VM IP so JConsole & co.
+# can connect from outside the Docker host (containers reach it via the bridge).
+confluent_jmx_hostname: "{{ confluent_advertised_host }}"
+
 # Schema Registry
 confluent_schema_registry_port: 8081
 confluent_schema_registry_heap: "512M"

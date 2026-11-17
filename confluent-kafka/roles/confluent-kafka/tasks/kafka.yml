@@ -37,6 +37,13 @@
     - "{{ confluent_control_center_port }}"
     - "{{ confluent_prometheus_port }}"
     - "{{ confluent_alertmanager_port }}"
+    # JMX ports (broker/controller, Schema Registry, Connect, REST Proxy, ksqlDB, Control Center)
+    - "{{ confluent_jmx_port_kafka }}"
+    - "{{ confluent_jmx_port_schema_registry }}"
+    - "{{ confluent_jmx_port_connect }}"
+    - "{{ confluent_jmx_port_kafka_rest }}"
+    - "{{ confluent_jmx_port_ksqldb }}"
+    - "{{ confluent_jmx_port_control_center }}"
   when: ansible_os_family == "Debian"
   failed_when: false
 
